@@ -196,3 +196,20 @@ def test_publish_open_catches_up_postings_stored_before_crawls_published(bank):
     assert bank.publish_open(page=1) == 1
     got = site(bank)
     assert set(got) == {"gh-acme-1"} and got["gh-acme-1"]["date_posted"] == rows(bank)["gh-acme-1"]["posted_at"]
+
+
+def test_posting_edited_out_of_early_career_is_removed_from_site(bank):
+    crawl_board(bank, the_board(bank), None, T0, read=reader_of(Listing([post(1, 'Intern')], True)))
+    crawl_board(bank, the_board(bank), None, T0 + timedelta(hours=1),
+                read=reader_of(Listing([post(1, 'Senior Engineer')], True)))
+    assert rows(bank)['gh-acme-1']['closed_at'] is None
+    assert not site(bank)['gh-acme-1']['is_active']
+
+
+def test_other_board_cannot_republish_a_posting_it_does_not_own(bank):
+    crawl_board(bank, the_board(bank), None, T0, read=reader_of(Listing([post(1, 'Intern')], True)))
+    bank.add_boards([(Board('greenhouse', 'other', 'Other'), 'https://boards.greenhouse.io/other', 'test')])
+    other = bank.query("select * from bank_boards where id = 'greenhouse:other'")[0]
+    crawl_board(bank, other, None, T0 + timedelta(hours=1),
+                read=reader_of(Listing([post(1, 'Different Intern')], True)))
+    assert site(bank)['gh-acme-1']['title'] == rows(bank)['gh-acme-1']['title'] == 'Intern'

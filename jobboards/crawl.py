@@ -132,5 +132,6 @@ def crawl(bank: Any, http: Any, budget_s: float = 2400, limit: int = 50000, work
         stats["job_bank_touched"] = bank.touch_published()
     except Exception:  # the site's rows age a day; the next run touches them
         log.exception("job_bank rows could not be marked seen")
+        stats["touch_error"] += 1
     bank.finish_run(run_id, dict(stats))
     return dict(stats)

@@ -59,6 +59,8 @@ def main(argv=None) -> None:
         else:
             stats = bank.stats()
         print(json.dumps(stats, indent=1, default=str))
+        if args.cmd == "crawl" and (stats.get("bank_error") or stats.get("touch_error")):
+            sys.exit("Crawl finished with database/publishing failures; see run counts above")
     finally:
         bank.close()
 

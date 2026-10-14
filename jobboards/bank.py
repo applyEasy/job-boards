@@ -93,6 +93,12 @@ class Bank:
                 self.conn.execute("update bank_postings set closed_at = %s, changed_at = %s "
                                   "where board_id = %s and id = any(%s) and closed_at is null",
                                   (now, now, board_id, closed))
+            if upserts:
+                # Publish only writes this board owns; another site's duplicate is ignored above.
+                owned = {r["id"] for r in self.conn.execute(
+                    "select id from bank_postings where board_id = %s and id = any(%s)",
+                    (board_id, [p.id for p in upserts]))}
+                upserts = list({p.id: p for p in upserts if p.id in owned}.values())
             self._publish(upserts, closed)
             self._board_update(board_id, sched, ", last_error = null, last_ok_at = %s, list_hash = %s, open_postings = "
                                "(select count(*) from bank_postings where board_id = %s and closed_at is null)",
@@ -103,8 +109,10 @@ class Bank:
         rows = job_bank_rows(upserts)
         if rows:
             self.conn.execute("select bank_publish(%s)", (Jsonb(rows),))
-        if closed:
-            self.conn.execute("select bank_unpublish(%s)", (closed,))
+        published = {r["source_id"] for r in rows}
+        removed = list(dict.fromkeys([*closed, *(p.id for p in upserts if p.id[:300] not in published)]))
+        if removed:
+            self.conn.execute("select bank_unpublish(%s)", (removed,))
 
     def publish_open(self, page: int = 5000) -> int:
         """Every open posting the site would show, onto it: the catch-up for postings the bank
