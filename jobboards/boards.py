@@ -79,7 +79,7 @@ def board_from_url(url: str) -> Optional[Board]:
         else:
             rest = path[1:] if path and _LOCALE.fullmatch(path[0]) else path
             site = rest[0] if rest else ""
-        site = _slug(site) if site not in ("job", "details", "login") else None
+        site = _slug(site) if site not in ("job", "details", "login") and "." not in site else None  # llms.txt, favicon.png
         return Board("workday", f"{host}/{site}") if site else None
 
     if host.endswith(".oraclecloud.com") and "sites" in path:

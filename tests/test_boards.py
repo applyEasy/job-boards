@@ -41,6 +41,8 @@ def test_public_board_links_become_boards(url, provider, key):
     "https://www.myworkdayjobs.com/x",
     "https://nvidia.wd5.myworkdayjobs.com/",
     "https://nvidia.wd5.myworkdayjobs.com/en-US",
+    "https://nvidia.wd5.myworkdayjobs.com/llms.txt",
+    "https://nvidia.wd5.myworkdayjobs.com/en-US/favicon.png",
     "https://user:pw@jobs.lever.co/zoox",
     "ftp://jobs.lever.co/zoox",
     "not a url",
