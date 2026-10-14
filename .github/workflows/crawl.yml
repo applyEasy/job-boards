@@ -1,5 +1,6 @@
 # Scheduled and manual runs only: the bank's secret is never exposed to pull requests.
 name: crawl
+run-name: ${{ inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || 'crawl' }}
 on:
   schedule:
     - cron: "23 * * * *"   # read the boards that are due

@@ -1,0 +1,36 @@
+# GitHub's cron is best effort: on this repo it went hours without firing once. So
+# each finished crawl or discover run queues the next one itself, 15 minutes later;
+# the cron in crawl.yml stays as a backstop. A cancelled run ends its chain, and
+# nothing is queued while another run waits or works, so chains never multiply.
+# Running often adds no load on employers: a crawl reads only the boards that are due.
+name: heartbeat
+on:
+  workflow_run:
+    workflows: [crawl]
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  actions: write
+  contents: read
+concurrency:
+  group: heartbeat
+  cancel-in-progress: true
+jobs:
+  next:
+    if: github.repository == 'applyEasy/job-boards' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion != 'cancelled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Wait 15 minutes, then queue the next run unless one is already waiting
+        run: |
+          sleep 900
+          busy=$(gh run list --workflow crawl.yml --limit 20 --json status --jq '[.[] | select(.status != "completed")] | length')
+          if [ "$busy" -gt 0 ]; then echo "a run is already queued or running"; exit 0; fi
+          last=$(gh run list --workflow crawl.yml --limit 200 --json displayTitle,createdAt \
+                   --jq '[.[] | select(.displayTitle == "discover")][0].createdAt // ""')
+          if [ -z "$last" ] || [ $(( $(date +%s) - $(date -d "$last" +%s) )) -gt 86400 ]; then next=discover; else next=crawl; fi
+          gh workflow run crawl.yml -f command=$next
+          echo "queued $next"
