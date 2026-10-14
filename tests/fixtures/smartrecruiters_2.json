@@ -1,0 +1,234 @@
+{
+ "offset": 2,
+ "limit": 2,
+ "totalFound": 673,
+ "content": [
+  {
+   "id": "744000155584859",
+   "name": "Senior Staff Software Engineer",
+   "uuid": "be9b1d02-7c92-4899-9342-b14528764c83",
+   "jobAdId": "9a06cfa2-c86f-40a7-bf86-a0d9d85b38e0",
+   "defaultJobAd": true,
+   "refNumber": "JB0076220",
+   "company": {
+    "identifier": "ServiceNow",
+    "name": "ServiceNow"
+   },
+   "releasedDate": "2026-10-14T17:59:06.016Z",
+   "location": {
+    "city": "San Diego",
+    "region": "California",
+    "country": "us",
+    "address": "4810 Eastgate Mall",
+    "postalCode": "92121",
+    "remote": false,
+    "hybrid": false,
+    "fullLocation": "San Diego, California, United States"
+   },
+   "industry": {
+    "id": "it_and_services",
+    "label": "Information Technology And Services"
+   },
+   "department": {
+    "id": "2294038",
+    "label": "Engineering, Infrastructure and Operations"
+   },
+   "function": {
+    "id": "engineering",
+    "label": "Engineering"
+   },
+   "typeOfEmployment": {
+    "id": "permanent",
+    "label": "Full-time"
+   },
+   "experienceLevel": {
+    "id": "not_applicable",
+    "label": "Not Applicable"
+   },
+   "customField": [
+    {
+     "fieldId": "60345fa28b4ba8595bef1863",
+     "fieldLabel": "Recruiting Team",
+     "valueId": "professional",
+     "valueLabel": "Professional"
+    },
+    {
+     "fieldId": "60345d5c5165a31b17288279",
+     "fieldLabel": "Region",
+     "valueId": "722a833b93e4437798309f43c0d25990",
+     "valueLabel": "AMS - North America and Canada"
+    },
+    {
+     "fieldId": "6034601b43915a29a4b3389b",
+     "fieldLabel": "Job Location",
+     "valueId": "L_SAN003",
+     "valueLabel": "4810 Eastgate Mall, San Diego, California, 92121, United States of America(L_SAN003)"
+    },
+    {
+     "fieldId": "60345e1a0b24a127cbdfa148",
+     "fieldLabel": "Employee Type",
+     "valueId": "0082f6cbe6154da19322cbab1f6aa5af",
+     "valueLabel": "Regular"
+    },
+    {
+     "fieldId": "5f63a78f1dae5c5c4e54ba2b",
+     "fieldLabel": "Department",
+     "valueId": "2294038",
+     "valueLabel": "Engineering, Infrastructure and Operations"
+    },
+    {
+     "fieldId": "COUNTRY",
+     "fieldLabel": "Country/Region",
+     "valueId": "us",
+     "valueLabel": "United States"
+    },
+    {
+     "fieldId": "5f63a78f1dae5c5c4e54ba2a",
+     "fieldLabel": "Brands",
+     "valueId": "default",
+     "valueLabel": "ServiceNow"
+    },
+    {
+     "fieldId": "603462175165a31b1728827d",
+     "fieldLabel": "Cost Center",
+     "valueId": "CC6308",
+     "valueLabel": "6308 Platform Engineering App Lifecycle"
+    },
+    {
+     "fieldId": "618ed92b8f5e5f110e5bfb95",
+     "fieldLabel": "Work Persona",
+     "valueId": "bf7551c6-9b06-4e7c-8217-3baf43edd060",
+     "valueLabel": "Flexible"
+    },
+    {
+     "fieldId": "690cc0e8c682c3dbadaa7d73",
+     "fieldLabel": "Job Posting Type",
+     "valueId": "professional",
+     "valueLabel": "Professional"
+    }
+   ],
+   "visibility": "PUBLIC",
+   "ref": "https://api.smartrecruiters.com/v1/companies/ServiceNow/postings/744000155584859",
+   "creator": {
+    "name": "Tina Schneider"
+   },
+   "language": {
+    "code": "en",
+    "label": "English",
+    "labelNative": "English (US)"
+   }
+  },
+  {
+   "id": "744000155584389",
+   "name": "Finance Development Rotation Program (FDRP)",
+   "uuid": "6efc8740-a1e7-4f73-859b-4736906924d9",
+   "jobAdId": "800e3d49-84c9-4759-a4e1-0a123410ab75",
+   "defaultJobAd": true,
+   "refNumber": "JB0075700",
+   "company": {
+    "identifier": "ServiceNow",
+    "name": "ServiceNow"
+   },
+   "releasedDate": "2026-10-14T17:57:06.610Z",
+   "location": {
+    "city": "Santa Clara",
+    "region": "CALIFORNIA",
+    "country": "us",
+    "address": "Building A,B,C 2225 Lawson Lane",
+    "postalCode": "95054",
+    "remote": false,
+    "hybrid": true,
+    "fullLocation": "Santa Clara, CALIFORNIA, United States"
+   },
+   "industry": {
+    "id": "it_and_services",
+    "label": "Information Technology And Services"
+   },
+   "department": {
+    "id": "2294072",
+    "label": "Finance & Accounting"
+   },
+   "function": {
+    "id": "finance",
+    "label": "Finance"
+   },
+   "typeOfEmployment": {
+    "id": "permanent",
+    "label": "Full-time"
+   },
+   "experienceLevel": {
+    "id": "not_applicable",
+    "label": "Not Applicable"
+   },
+   "customField": [
+    {
+     "fieldId": "60345fa28b4ba8595bef1863",
+     "fieldLabel": "Recruiting Team",
+     "valueId": "early-in-career",
+     "valueLabel": "Global Emerging Talent"
+    },
+    {
+     "fieldId": "60345d5c5165a31b17288279",
+     "fieldLabel": "Region",
+     "valueId": "722a833b93e4437798309f43c0d25990",
+     "valueLabel": "AMS - North America and Canada"
+    },
+    {
+     "fieldId": "6034601b43915a29a4b3389b",
+     "fieldLabel": "Job Location",
+     "valueId": "L_SJC005",
+     "valueLabel": "2225 Lawson Lane, Santa Clara, California, 95054, United States of America(L_SJC005)"
+    },
+    {
+     "fieldId": "60345e1a0b24a127cbdfa148",
+     "fieldLabel": "Employee Type",
+     "valueId": "0082f6cbe6154da19322cbab1f6aa5af",
+     "valueLabel": "Regular"
+    },
+    {
+     "fieldId": "5f63a78f1dae5c5c4e54ba2b",
+     "fieldLabel": "Department",
+     "valueId": "2294072",
+     "valueLabel": "Finance & Accounting"
+    },
+    {
+     "fieldId": "COUNTRY",
+     "fieldLabel": "Country/Region",
+     "valueId": "us",
+     "valueLabel": "United States"
+    },
+    {
+     "fieldId": "5f63a78f1dae5c5c4e54ba2a",
+     "fieldLabel": "Brands",
+     "valueId": "default",
+     "valueLabel": "ServiceNow"
+    },
+    {
+     "fieldId": "603462175165a31b1728827d",
+     "fieldLabel": "Cost Center",
+     "valueId": "CC5250",
+     "valueLabel": "5250 Financial Development Program"
+    },
+    {
+     "fieldId": "618ed92b8f5e5f110e5bfb95",
+     "fieldLabel": "Work Persona",
+     "valueId": "bf7551c6-9b06-4e7c-8217-3baf43edd060",
+     "valueLabel": "Flexible"
+    },
+    {
+     "fieldId": "690cc0e8c682c3dbadaa7d73",
+     "fieldLabel": "Job Posting Type",
+     "valueId": "early-career",
+     "valueLabel": "Early Career"
+    }
+   ],
+   "visibility": "PUBLIC",
+   "ref": "https://api.smartrecruiters.com/v1/companies/ServiceNow/postings/744000155584389",
+   "language": {
+    "code": "en",
+    "label": "English",
+    "labelNative": "English (US)"
+   }
+  }
+ ]
+}

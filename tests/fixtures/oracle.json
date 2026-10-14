@@ -1,0 +1,494 @@
+{
+ "items": [
+  {
+   "SearchId": 1,
+   "Keyword": null,
+   "CorrectedKeyword": null,
+   "UseExactKeywordFlag": false,
+   "SuggestedKeyword": null,
+   "ExecuteSpellCheckFlag": true,
+   "Location": null,
+   "LocationId": null,
+   "Radius": 0,
+   "RadiusUnit": "MI",
+   "SelectedTitlesFacet": null,
+   "SelectedCategoriesFacet": null,
+   "SelectedPostingDatesFacet": null,
+   "SelectedLocationsFacet": null,
+   "LastSelectedFacet": null,
+   "Facets": "TITLES;LOCATIONS;LOCATION_LEVEL1;LOCATION_LEVEL2;LOCATION_LEVEL3;CATEGORIES;POSTING_DATES;WORK_LOCATIONS;FLEX_FIELDS;ORGANIZATIONS;WORKPLACE_TYPES",
+   "Offset": 0,
+   "Limit": 3,
+   "SortBy": "POSTING_DATES_DESC",
+   "TotalJobsCount": 843,
+   "Latitude": null,
+   "Longitude": null,
+   "SiteNumber": "CX",
+   "JobFamilyId": null,
+   "PostingStartDate": null,
+   "PostingEndDate": null,
+   "SelectedWorkLocationsFacet": null,
+   "RequisitionId": null,
+   "CandidateNumber": null,
+   "WorkLocationZipCode": null,
+   "WorkLocationCountryCode": null,
+   "SelectedFlexFieldsFacets": null,
+   "OrganizationId": null,
+   "SelectedOrganizationsFacet": null,
+   "UserTargetFacetName": null,
+   "UserTargetFacetInputTerm": null,
+   "HotJobFlag": null,
+   "WorkplaceType": null,
+   "SelectedWorkplaceTypesFacet": null,
+   "BotQRShortCode": null,
+   "requisitionList": [
+    {
+     "Id": "25009749",
+     "Title": "Global Security Operations Center (GSOC) Operator",
+     "PostedDate": "2026-10-14",
+     "PostingEndDate": null,
+     "Language": "US",
+     "PrimaryLocationCountry": "US",
+     "GeographyId": 300000056282337,
+     "HotJobFlag": false,
+     "WorkplaceTypeCode": null,
+     "JobFamily": null,
+     "JobFunction": null,
+     "WorkerType": null,
+     "ContractType": null,
+     "ManagerLevel": null,
+     "JobSchedule": null,
+     "JobShift": null,
+     "JobType": null,
+     "StudyLevel": null,
+     "DomesticTravelRequired": null,
+     "InternationalTravelRequired": null,
+     "WorkDurationYears": null,
+     "WorkDurationMonths": null,
+     "WorkHours": null,
+     "WorkDays": null,
+     "LegalEmployer": null,
+     "BusinessUnit": null,
+     "Department": null,
+     "Organization": null,
+     "BusinessUnitId": 300000002955206,
+     "LegalEmployerId": 300000061316156,
+     "OrganizationId": 300000069077378,
+     "MediaThumbURL": "https://img.youtube.com/vi/6q_3FAFJEzE/hqdefault.jpg",
+     "ShortDescriptionStr": "",
+     "PrimaryLocation": "Dallas, TX, United States",
+     "Distance": 1791936000000.0,
+     "TrendingFlag": true,
+     "BeFirstToApplyFlag": false,
+     "Relevancy": 9,
+     "WorkplaceType": "",
+     "ExternalQualificationsStr": null,
+     "ExternalResponsibilitiesStr": null,
+     "secondaryLocations": []
+    },
+    {
+     "Id": "25011799",
+     "Title": "2027 Intake Intern (Logistics/Procurement/ Data Analytics)",
+     "PostedDate": "2026-10-14",
+     "PostingEndDate": null,
+     "Language": "US",
+     "PrimaryLocationCountry": "MY",
+     "GeographyId": 100001734404968,
+     "HotJobFlag": false,
+     "WorkplaceTypeCode": null,
+     "JobFamily": null,
+     "JobFunction": null,
+     "WorkerType": null,
+     "ContractType": null,
+     "ManagerLevel": null,
+     "JobSchedule": null,
+     "JobShift": null,
+     "JobType": null,
+     "StudyLevel": null,
+     "DomesticTravelRequired": null,
+     "InternationalTravelRequired": null,
+     "WorkDurationYears": null,
+     "WorkDurationMonths": null,
+     "WorkHours": null,
+     "WorkDays": null,
+     "LegalEmployer": null,
+     "BusinessUnit": null,
+     "Department": null,
+     "Organization": null,
+     "BusinessUnitId": 300000002955285,
+     "LegalEmployerId": 300000061425064,
+     "OrganizationId": 300000069088699,
+     "MediaThumbURL": "https://img.youtube.com/vi/6q_3FAFJEzE/hqdefault.jpg",
+     "ShortDescriptionStr": "",
+     "PrimaryLocation": "Wilayah Persekutuan Kuala Lumpur, Malaysia",
+     "Distance": 1791936000000.0,
+     "TrendingFlag": false,
+     "BeFirstToApplyFlag": false,
+     "Relevancy": 9,
+     "WorkplaceType": "",
+     "ExternalQualificationsStr": null,
+     "ExternalResponsibilitiesStr": null,
+     "secondaryLocations": []
+    },
+    {
+     "Id": "25011985",
+     "Title": "2027 Intake Intern (Accounting/Tax/ Finance)",
+     "PostedDate": "2026-10-14",
+     "PostingEndDate": null,
+     "Language": "US",
+     "PrimaryLocationCountry": "MY",
+     "GeographyId": 100001734404968,
+     "HotJobFlag": false,
+     "WorkplaceTypeCode": null,
+     "JobFamily": null,
+     "JobFunction": null,
+     "WorkerType": null,
+     "ContractType": null,
+     "ManagerLevel": null,
+     "JobSchedule": null,
+     "JobShift": null,
+     "JobType": null,
+     "StudyLevel": null,
+     "DomesticTravelRequired": null,
+     "InternationalTravelRequired": null,
+     "WorkDurationYears": null,
+     "WorkDurationMonths": null,
+     "WorkHours": null,
+     "WorkDays": null,
+     "LegalEmployer": null,
+     "BusinessUnit": null,
+     "Department": null,
+     "Organization": null,
+     "BusinessUnitId": 300000002955285,
+     "LegalEmployerId": 300000061425064,
+     "OrganizationId": 300000069078463,
+     "MediaThumbURL": "https://img.youtube.com/vi/6q_3FAFJEzE/hqdefault.jpg",
+     "ShortDescriptionStr": "",
+     "PrimaryLocation": "Wilayah Persekutuan Kuala Lumpur, Malaysia",
+     "Distance": 1791936000000.0,
+     "TrendingFlag": false,
+     "BeFirstToApplyFlag": true,
+     "Relevancy": 9,
+     "WorkplaceType": "",
+     "ExternalQualificationsStr": null,
+     "ExternalResponsibilitiesStr": null,
+     "secondaryLocations": []
+    }
+   ],
+   "categoriesFacet": [
+    {
+     "Id": 300000068853972,
+     "Name": "Engineering - Product Dev",
+     "TotalCount": 413
+    },
+    {
+     "Id": 300000068854028,
+     "Name": "Manufacturing",
+     "TotalCount": 204
+    },
+    {
+     "Id": 300000068853925,
+     "Name": "Sales",
+     "TotalCount": 50
+    },
+    {
+     "Id": 300000068853932,
+     "Name": "Facilities",
+     "TotalCount": 39
+    },
+    {
+     "Id": 300000068853914,
+     "Name": "Supply Chain & Operations",
+     "TotalCount": 34
+    },
+    {
+     "Id": 300000068853892,
+     "Name": "Information Technology",
+     "TotalCount": 30
+    },
+    {
+     "Id": 300000068854013,
+     "Name": "Finance",
+     "TotalCount": 22
+    },
+    {
+     "Id": 300000068853935,
+     "Name": "Quality",
+     "TotalCount": 18
+    },
+    {
+     "Id": 300000068853983,
+     "Name": "Human Resources",
+     "TotalCount": 13
+    },
+    {
+     "Id": 300000068853938,
+     "Name": "Communications",
+     "TotalCount": 8
+    }
+   ],
+   "locationsFacet": [
+    {
+     "Id": 300000000361862,
+     "Name": "United States",
+     "TotalCount": 447
+    },
+    {
+     "Id": 300000056252120,
+     "Name": "TX, United States",
+     "TotalCount": 327
+    },
+    {
+     "Id": 300000056282337,
+     "Name": "Dallas, TX, United States",
+     "TotalCount": 259
+    },
+    {
+     "Id": 300000000361484,
+     "Name": "India",
+     "TotalCount": 138
+    },
+    {
+     "Id": 100001734537892,
+     "Name": "Karnataka, India",
+     "TotalCount": 129
+    },
+    {
+     "Id": 100001734561645,
+     "Name": "Bengaluru, Karnataka, India",
+     "TotalCount": 129
+    },
+    {
+     "Id": 300000000361316,
+     "Name": "China",
+     "TotalCount": 95
+    },
+    {
+     "Id": 100001675428757,
+     "Name": "Shanghai, China",
+     "TotalCount": 51
+    },
+    {
+     "Id": 300000056252121,
+     "Name": "UT, United States",
+     "TotalCount": 48
+    },
+    {
+     "Id": 300000056300723,
+     "Name": "Lehi, UT, United States",
+     "TotalCount": 48
+    }
+   ],
+   "postingDatesFacet": [
+    {
+     "Id": 7,
+     "Name": "Less than 7 days",
+     "TotalCount": 60
+    },
+    {
+     "Id": 30,
+     "Name": "Less than 30 days",
+     "TotalCount": 311
+    },
+    {
+     "Id": 31,
+     "Name": "Greater than 30 days",
+     "TotalCount": 532
+    }
+   ],
+   "titlesFacet": [
+    {
+     "Id": "DESIGN",
+     "Name": "Design Engineering",
+     "TotalCount": 173
+    },
+    {
+     "Id": "MFGENG",
+     "Name": "Manufacturing Engineering",
+     "TotalCount": 116
+    },
+    {
+     "Id": "APPS",
+     "Name": "Applications",
+     "TotalCount": 65
+    },
+    {
+     "Id": "MFGTEC",
+     "Name": "Manufacturing Technicians",
+     "TotalCount": 60
+    },
+    {
+     "Id": "TEST",
+     "Name": "Test Engineer",
+     "TotalCount": 42
+    },
+    {
+     "Id": "PE",
+     "Name": "Product Eng",
+     "TotalCount": 33
+    },
+    {
+     "Id": "OPERAT",
+     "Name": "Operations",
+     "TotalCount": 31
+    },
+    {
+     "Id": "SALES",
+     "Name": "Sales",
+     "TotalCount": 31
+    },
+    {
+     "Id": "SYS",
+     "Name": "Systems",
+     "TotalCount": 30
+    },
+    {
+     "Id": "FACOPS",
+     "Name": "Facilities Operations",
+     "TotalCount": 27
+    }
+   ],
+   "workLocationsFacet": [
+    {
+     "Id": 300000068944502,
+     "Name": "Dallas > South Campus",
+     "TotalCount": 150
+    },
+    {
+     "Id": 300000069115694,
+     "Name": "Bengaluru > India, Bengaluru-Bagmane Lakeview",
+     "TotalCount": 64
+    },
+    {
+     "Id": 300000972512782,
+     "Name": "Lehi > Lehi, UT",
+     "TotalCount": 49
+    },
+    {
+     "Id": 300000069138891,
+     "Name": "Richardson > Richardson Fab, Renner Rd",
+     "TotalCount": 47
+    },
+    {
+     "Id": 300000069140837,
+     "Name": "Shanghai > China, Shanghai",
+     "TotalCount": 44
+    },
+    {
+     "Id": 300001358100145,
+     "Name": "Sherman > Sherman - SM1 Fab",
+     "TotalCount": 37
+    },
+    {
+     "Id": 300000069138943,
+     "Name": "Bengaluru > India, Bengaluru-Bagmane TechPk",
+     "TotalCount": 36
+    },
+    {
+     "Id": 300001539656506,
+     "Name": "Bengaluru > India, Bengaluru-Cosmos Ariel",
+     "TotalCount": 35
+    },
+    {
+     "Id": 300000069115462,
+     "Name": "Chengdu > China, Chengdu AT",
+     "TotalCount": 32
+    },
+    {
+     "Id": 300000068944151,
+     "Name": "Freising > Germany, Freising",
+     "TotalCount": 28
+    }
+   ],
+   "flexFieldsFacet": [
+    {
+     "Name": "AttributeChar8",
+     "Label": "Experience Level"
+    }
+   ],
+   "organizationsFacet": [
+    {
+     "Id": 300000069074195,
+     "Name": "118-WW TMG MFG OPS",
+     "TotalCount": 202
+    },
+    {
+     "Id": 300000069072909,
+     "Name": "113-ANALOG POWER",
+     "TotalCount": 113
+    },
+    {
+     "Id": 300001517495017,
+     "Name": "PIPELINE 2",
+     "TotalCount": 87
+    },
+    {
+     "Id": 300000069069738,
+     "Name": "129-EMBEDDED PROCESSORS",
+     "TotalCount": 81
+    },
+    {
+     "Id": 300000069074143,
+     "Name": "123-SC MARKETING",
+     "TotalCount": 72
+    },
+    {
+     "Id": 300000069072385,
+     "Name": "112-ANALOG SIGNAL CHAIN",
+     "TotalCount": 66
+    },
+    {
+     "Id": 300001109677544,
+     "Name": "119-TMG TECH GROUP",
+     "TotalCount": 53
+    },
+    {
+     "Id": 300000069078463,
+     "Name": "193-TI FINANCE",
+     "TotalCount": 41
+    },
+    {
+     "Id": 300000069077378,
+     "Name": "190-FACILITIES SUPP&SVCS",
+     "TotalCount": 32
+    },
+    {
+     "Id": 300001531708533,
+     "Name": "114-CUSTOM INVESTMENTS",
+     "TotalCount": 23
+    }
+   ],
+   "workplaceTypesFacet": [
+    {
+     "Id": "ORA_ON_SITE",
+     "Name": "On-site",
+     "TotalCount": 843
+    }
+   ]
+  }
+ ],
+ "count": 1,
+ "hasMore": false,
+ "limit": 200,
+ "offset": 0,
+ "links": [
+  {
+   "rel": "self",
+   "href": "https://edbz.fa.us2.oraclecloud.com:443/hcmRestApi/resources/11.13.18.05/recruitingCEJobRequisitions",
+   "name": "recruitingCEJobRequisitions",
+   "kind": "collection"
+  },
+  {
+   "rel": "action",
+   "href": "https://edbz.fa.us2.oraclecloud.com:443/hcmRestApi/resources/11.13.18.05/recruitingCEJobRequisitions/action/getRequisitionsLocationCoordinates",
+   "name": "getRequisitionsLocationCoordinates",
+   "kind": "other"
+  },
+  {
+   "rel": "action",
+   "href": "https://edbz.fa.us2.oraclecloud.com:443/hcmRestApi/resources/11.13.18.05/recruitingCEJobRequisitions/action/getRequisitionDetailsForMap",
+   "name": "getRequisitionDetailsForMap",
+   "kind": "other"
+  }
+ ]
+}

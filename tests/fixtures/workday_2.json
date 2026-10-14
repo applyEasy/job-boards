@@ -1,0 +1,24 @@
+{
+ "total": 0,
+ "jobPostings": [
+  {
+   "title": "Principal Business System Analyst, Engineering Operations",
+   "externalPath": "/job/US-CA-Santa-Clara/Principal-Business-System-Analyst--Engineering-Operations_JR2026984",
+   "locationsText": "US, CA, Santa Clara",
+   "postedOn": "Posted Today",
+   "bulletFields": [
+    "JR2026984"
+   ]
+  },
+  {
+   "title": "Senior Field Applications Engineer, AI Infrastructure Build - Execution",
+   "externalPath": "/job/US-TX-Remote/Senior-Field-Applications-Engineer--AI-Infrastructure-Build---Execution_JR2027591",
+   "locationsText": "2 Locations",
+   "postedOn": "Posted Today",
+   "bulletFields": [
+    "JR2027591"
+   ]
+  }
+ ],
+ "userAuthenticated": false
+}

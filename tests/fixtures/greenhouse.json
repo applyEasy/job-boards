@@ -1,0 +1,85 @@
+{
+ "jobs": [
+  {
+   "absolute_url": "https://www.crossriver.com/greenhouse?gh_jid=7820777003",
+   "data_compliance": [
+    {
+     "type": "gdpr",
+     "requires_consent": false,
+     "requires_processing_consent": false,
+     "requires_retention_consent": false,
+     "retention_period": null,
+     "demographic_data_consent_applies": false
+    }
+   ],
+   "internal_job_id": 5802397003,
+   "location": {
+    "name": "Fort Lee, New Jersey, United States"
+   },
+   "metadata": null,
+   "id": 7820777003,
+   "updated_at": "2026-08-31T16:04:40-04:00",
+   "requisition_id": "1574",
+   "title": "Analyst, Consumer Compliance, Monitoring & Oversight",
+   "company_name": "Cross River",
+   "first_published": "2026-07-29T16:39:06-04:00",
+   "language": "en",
+   "application_deadline": null
+  },
+  {
+   "absolute_url": "https://www.crossriver.com/greenhouse?gh_jid=7806194003",
+   "data_compliance": [
+    {
+     "type": "gdpr",
+     "requires_consent": false,
+     "requires_processing_consent": false,
+     "requires_retention_consent": false,
+     "retention_period": null,
+     "demographic_data_consent_applies": false
+    }
+   ],
+   "internal_job_id": 5796051003,
+   "location": {
+    "name": "Fort Lee, New Jersey, United States"
+   },
+   "metadata": null,
+   "id": 7806194003,
+   "updated_at": "2026-08-31T16:04:40-04:00",
+   "requisition_id": "1567",
+   "title": "Associate, AI UX Designer",
+   "company_name": "Cross River",
+   "first_published": "2026-07-16T12:15:29-04:00",
+   "language": "en",
+   "application_deadline": null
+  },
+  {
+   "absolute_url": "https://www.crossriver.com/greenhouse?gh_jid=7865838003",
+   "data_compliance": [
+    {
+     "type": "gdpr",
+     "requires_consent": false,
+     "requires_processing_consent": false,
+     "requires_retention_consent": false,
+     "retention_period": null,
+     "demographic_data_consent_applies": false
+    }
+   ],
+   "internal_job_id": 5823701003,
+   "location": {
+    "name": "Fort Lee, New Jersey, United States"
+   },
+   "metadata": null,
+   "id": 7865838003,
+   "updated_at": "2026-09-23T16:50:43-04:00",
+   "requisition_id": "1586",
+   "title": "Associate, Construction Lending",
+   "company_name": "Cross River",
+   "first_published": "2026-08-14T10:53:08-04:00",
+   "language": "en",
+   "application_deadline": null
+  }
+ ],
+ "meta": {
+  "total": 3
+ }
+}

@@ -1,0 +1,81 @@
+[
+ {
+  "categories": {
+   "commitment": "Full-time",
+   "department": "Executive Office",
+   "location": "Foster City, CA",
+   "team": "Executive Office",
+   "allLocations": [
+    "Foster City, CA"
+   ]
+  },
+  "createdAt": 1791307664932,
+  "id": "e8a190f0-7a89-4c11-a6a0-452ff6234749",
+  "salaryRange": {
+   "min": 123000,
+   "max": 168000,
+   "currency": "USD",
+   "interval": "per-year-salary"
+  },
+  "salaryDescription": "<div><strong style=\"font-size: 16px;\">Base Salary Range</strong></div>\n<div>&nbsp;</div>\n<div><span style=\"font-size: 16px;\">There are three major components to compensation for this position: salary, Amazon Restricted Stock Units (RSUs), and Zoox Stock Appreciation Rights. A sign-on bonus may be offered as part of the compensation package. The listed range applies only to the base salary. Compensation will vary based on geographic location and level. Leveling, as well as positioning within a level, is determined by a range of factors, including, but not limited to, a candidate's relevant years of experience, domain knowledge, and interview performance. The salary range listed in this posting is representative of the range of levels Zoox is considering for this position.</span></div>\n<div>&nbsp;</div>\n<div><span style=\"font-size: 16px;\">Zoox also offers a comprehensive package of benefits, including paid time off (e.g. sick leave, vacation, bereavement), unpaid time off, Zoox Stock Appreciation Rights, Amazon RSUs, health insurance, long-term care insurance, long-term and short-term disability insurance, and life insurance.</span></div>",
+  "salaryDescriptionPlain": "Base Salary Range\n\u00a0\nThere are three major components to compensation for this position: salary, Amazon Restricted Stock Units (RSUs), and Zoox Stock Appreciation Rights. A sign-on bonus may be offered as part of the compensation package. The listed range applies only to the base salary. Compensation will vary based on geographic location and level. Leveling, as well as positioning within a level, is determined by a range of factors, including, but not limited to, a candidate's relevant years of experience, domain knowledge, and interview performance. The salary range listed in this posting is representative of the range of levels Zoox is considering for this position.\n\u00a0\nZoox also offers a comprehensive package of benefits, including paid time off (e.g. sick leave, vacation, bereavement), unpaid time off, Zoox Stock Appreciation Rights, Amazon RSUs, health insurance, long-term care insurance, long-term and short-term disability insurance, and life insurance.\n",
+  "text": "Administrative Business Partner, Floater",
+  "country": "US",
+  "workplaceType": "hybrid",
+  "hostedUrl": "https://jobs.lever.co/zoox/e8a190f0-7a89-4c11-a6a0-452ff6234749",
+  "applyUrl": "https://jobs.lever.co/zoox/e8a190f0-7a89-4c11-a6a0-452ff6234749/apply"
+ },
+ {
+  "categories": {
+   "commitment": "Full-time",
+   "department": "Safety Strategy and Operations",
+   "location": "Foster City, CA",
+   "team": "Safety Strategy and Operations",
+   "allLocations": [
+    "Foster City, CA"
+   ]
+  },
+  "createdAt": 1757985728853,
+  "id": "e36cc53e-5bd5-43b9-9a90-ec9b7c6abda9",
+  "salaryRange": {
+   "currency": "USD",
+   "interval": "per-year-salary",
+   "min": 160000,
+   "max": 221000
+  },
+  "salaryDescription": "<div><strong style=\"font-size: 16px;\">Base Salary Range</strong></div>\n<div>&nbsp;</div>\n<div><span style=\"font-size: 16px;\">There are three major components to compensation for this position: salary, Amazon Restricted Stock Units (RSUs), and Zoox Stock Appreciation Rights. A sign-on bonus may be offered as part of the compensation package. The listed range applies only to the base salary. Compensation will vary based on geographic location and level. Leveling, as well as positioning within a level, is determined by a range of factors, including, but not limited to, a candidate's relevant years of experience, domain knowledge, and interview performance. The salary range listed in this posting is representative of the range of levels Zoox is considering for this position.</span></div>\n<div>&nbsp;</div>\n<div><span style=\"font-size: 16px;\">Zoox also offers a comprehensive package of benefits, including paid time off (e.g. sick leave, vacation, bereavement), unpaid time off, Zoox Stock Appreciation Rights, Amazon RSUs, health insurance, long-term care insurance, long-term and short-term disability insurance, and life insurance.</span></div>",
+  "salaryDescriptionPlain": "Base Salary Range\n\u00a0\nThere are three major components to compensation for this position: salary, Amazon Restricted Stock Units (RSUs), and Zoox Stock Appreciation Rights. A sign-on bonus may be offered as part of the compensation package. The listed range applies only to the base salary. Compensation will vary based on geographic location and level. Leveling, as well as positioning within a level, is determined by a range of factors, including, but not limited to, a candidate's relevant years of experience, domain knowledge, and interview performance. The salary range listed in this posting is representative of the range of levels Zoox is considering for this position.\n\u00a0\nZoox also offers a comprehensive package of benefits, including paid time off (e.g. sick leave, vacation, bereavement), unpaid time off, Zoox Stock Appreciation Rights, Amazon RSUs, health insurance, long-term care insurance, long-term and short-term disability insurance, and life insurance.\n",
+  "text": "AV Safety Data Reporting Engineer",
+  "country": "US",
+  "workplaceType": "hybrid",
+  "hostedUrl": "https://jobs.lever.co/zoox/e36cc53e-5bd5-43b9-9a90-ec9b7c6abda9",
+  "applyUrl": "https://jobs.lever.co/zoox/e36cc53e-5bd5-43b9-9a90-ec9b7c6abda9/apply"
+ },
+ {
+  "categories": {
+   "commitment": "Full-time",
+   "department": "Vehicle Development",
+   "level": "All Levels",
+   "location": "Foster City, CA",
+   "team": "Body, Closures and Chassis",
+   "allLocations": [
+    "Foster City, CA"
+   ]
+  },
+  "createdAt": 1789072867958,
+  "id": "7980e9a3-99f3-4988-ae6d-355c9199d8fb",
+  "salaryRange": {
+   "currency": "USD",
+   "interval": "per-year-salary",
+   "min": 170000,
+   "max": 204000
+  },
+  "salaryDescription": "<div><strong>Base Salary Range</strong><br>&nbsp;<br>There are three major components to compensation for this position: salary, Amazon Restricted Stock Units (RSUs), and Zoox Stock Appreciation Rights. A sign-on bonus may be offered as part of the compensation package. The listed range applies only to the base salary. Compensation will vary based on geographic location and level. Leveling, as well as positioning within a level, is determined by a range of factors, including, but not limited to, a candidate's relevant years of experience, domain knowledge, and interview performance. The salary range listed in this posting is representative of the range of levels Zoox is considering for this position.</div>",
+  "salaryDescriptionPlain": "Base Salary Range\n\u00a0\nThere are three major components to compensation for this position: salary, Amazon Restricted Stock Units (RSUs), and Zoox Stock Appreciation Rights. A sign-on bonus may be offered as part of the compensation package. The listed range applies only to the base salary. Compensation will vary based on geographic location and level. Leveling, as well as positioning within a level, is determined by a range of factors, including, but not limited to, a candidate's relevant years of experience, domain knowledge, and interview performance. The salary range listed in this posting is representative of the range of levels Zoox is considering for this position.\n",
+  "text": "Body Structures Engineer",
+  "country": "US",
+  "workplaceType": "onsite",
+  "hostedUrl": "https://jobs.lever.co/zoox/7980e9a3-99f3-4988-ae6d-355c9199d8fb",
+  "applyUrl": "https://jobs.lever.co/zoox/7980e9a3-99f3-4988-ae6d-355c9199d8fb/apply"
+ }
+]

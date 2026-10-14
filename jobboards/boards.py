@@ -8,7 +8,7 @@ guessed slug.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from urllib.parse import parse_qs, unquote, urlsplit
 
@@ -19,6 +19,7 @@ PROVIDERS = ("greenhouse", "lever", "ashby", "smartrecruiters", "workday", "orac
 class Board:
     provider: str
     key: str  # slug, host, or host/site as first found
+    company_name: str = field(default="", compare=False)  # from the evidence, when it named one
 
     @property
     def id(self) -> str:
