@@ -1,0 +1,18 @@
+[project]
+name = "jobboards"
+version = "0.1.0"
+description = "Finds employer job boards on its own and keeps every posting on them in a bank."
+requires-python = ">=3.12"
+dependencies = ["requests>=2.32,<3", "psycopg[binary]>=3.2,<4"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["jobboards"]
+
+[tool.setuptools.package-data]
+jobboards = ["data/*"]
