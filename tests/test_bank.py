@@ -26,8 +26,9 @@ T0 = datetime(2026, 10, 14, 12, tzinfo=timezone.utc)
 @pytest.fixture
 def bank():
     with psycopg.connect(DSN, autocommit=True) as conn:
-        conn.execute("do $$ begin if not exists (select 1 from pg_roles where rolname='anon') then "
-                     "create role anon nologin; create role authenticated nologin; end if; end $$")
+        for role in ("anon", "authenticated", "service_role"):  # Supabase's roles the migration grants to
+            conn.execute(f"do $$ begin if not exists (select 1 from pg_roles where rolname = '{role}') then "
+                         f"create role {role} nologin; end if; end $$")
         # Tables only: the role may hold grants in another database of this cluster.
         conn.execute("drop table if exists bank_postings, bank_boards, bank_cursors, bank_discovery, bank_runs")
         conn.execute((SQL / "20261014_boards_bank.sql").read_text())
