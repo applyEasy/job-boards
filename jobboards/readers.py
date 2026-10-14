@@ -365,6 +365,15 @@ def _ld_places(posting: dict) -> List[str]:
     return _places(out)
 
 
+def _same_instant(a: Optional[str], b: Optional[str]) -> bool:
+    if a is None or b is None:
+        return a == b
+    try:
+        return datetime.fromisoformat(a) == datetime.fromisoformat(b)
+    except ValueError:
+        return a == b
+
+
 def read_icims(board: Board, http: Any, known: Dict[str, Optional[str]]) -> Listing:
     host = board.key
     prefix = host.split(".")[0].lower()
@@ -384,7 +393,7 @@ def read_icims(board: Board, http: Any, known: Dict[str, Optional[str]]) -> List
             continue
         seen.add(job_id)
         posting_id, lastmod = f"ic-{prefix}-{job_id}", lastmod or None
-        if posting_id in known and known[posting_id] == lastmod:
+        if posting_id in known and _same_instant(known[posting_id], lastmod):
             keep.add(posting_id)
             continue
         path = f"/jobs/{job_id}/job?in_iframe=1"

@@ -216,3 +216,10 @@ def test_hash_ignores_dates_so_relative_dates_do_not_churn():
     from dataclasses import replace
     assert replace(p, posted_at="1999-01-01").content_hash() == p.content_hash()
     assert replace(p, title=p.title + "!").content_hash() != p.content_hash()
+
+
+def test_icims_compares_lastmod_as_an_instant_not_as_text():
+    # The bank hands back timestamptz in UTC; the sitemap writes local offsets.
+    known = {"ic-careers-gdms-75473": "2026-10-14T18:14:41+00:00", "ic-careers-gdms-74677": "2026-10-14T18:00:40+00:00"}
+    listing, _ = read("icims", "careers-gdms.icims.com", _icims_routes(), known=known)
+    assert listing.postings == [] and listing.keep == set(known)
