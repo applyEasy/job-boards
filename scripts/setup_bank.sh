@@ -15,6 +15,13 @@ REPO=${REPO:-applyEasy/job-boards}
 GH=${GH:-gh}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 
+case $DATABASE_URL in
+  postgres://*|postgresql://*) ;;
+  *) echo "DATABASE_URL must be the Postgres connection string (postgresql://...), not the API URL." >&2
+     echo "Supabase Dashboard > Connect > Session pooler > URI, with your database password filled in." >&2
+     exit 1 ;;
+esac
+
 part() { python3 -I -c 'import sys, urllib.parse as u; p = u.urlsplit(sys.argv[1]); print(getattr(p, sys.argv[2]) or "")' "$DATABASE_URL" "$1"; }
 user=$(part username)
 host=$(part hostname)
