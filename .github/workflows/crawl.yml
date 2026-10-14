@@ -8,7 +8,7 @@ on:
     inputs:
       command:
         type: choice
-        options: [crawl, discover, stats]
+        options: [crawl, discover, publish, stats]
         default: crawl
 permissions:
   contents: read

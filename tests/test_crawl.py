@@ -50,12 +50,13 @@ def board(**kw):
     return row
 
 
-def test_changed_board_is_read_again_in_six_hours():
+def test_changed_board_is_read_again_in_an_hour():
     s = schedule(board(interval_hours=24), "changed", NOW)
-    assert s["status"] == "active" and s["next_check_at"] == NOW + timedelta(hours=6) and s["fail_count"] == 0
+    assert s["status"] == "active" and s["next_check_at"] == NOW + timedelta(hours=1) and s["fail_count"] == 0
 
 
 def test_unchanged_board_waits_twice_as_long_up_to_two_days():
+    assert schedule(board(interval_hours=1), "unchanged", NOW)["interval_hours"] == 2
     assert schedule(board(interval_hours=6), "unchanged", NOW)["interval_hours"] == 12
     assert schedule(board(interval_hours=48), "unchanged", NOW)["interval_hours"] == 48
 

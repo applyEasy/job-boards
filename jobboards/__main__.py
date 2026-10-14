@@ -1,4 +1,4 @@
-"""python -m jobboards discover | crawl | stats   (BANK_DATABASE_URL names the bank)"""
+"""python -m jobboards discover | crawl | publish | stats   (BANK_DATABASE_URL names the bank)"""
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ def main(argv=None) -> None:
     run.add_argument("--budget", type=float, default=2400, help="seconds to keep starting boards")
     run.add_argument("--limit", type=int, default=50000, help="most boards to take this run")
     run.add_argument("--workers", type=int, default=16)
+    sub.add_parser("publish", help="put every open intern/new-grad posting in the bank on the site (catch-up)")
     sub.add_parser("stats", help="boards and open postings per platform")
     args = parser.parse_args(argv)
 
@@ -45,6 +46,8 @@ def main(argv=None) -> None:
             bank.finish_run(run_id, stats)
         elif args.cmd == "crawl":
             stats = crawl(bank, http, budget_s=args.budget, limit=args.limit, workers=args.workers)
+        elif args.cmd == "publish":
+            stats = {"job_bank_rows_written": bank.publish_open()}
         else:
             stats = bank.stats()
         print(json.dumps(stats, indent=1, default=str))

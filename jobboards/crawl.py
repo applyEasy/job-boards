@@ -17,7 +17,10 @@ from jobboards.readers import READERS, Listing, NotABoard, Posting
 
 log = logging.getLogger("jobboards.crawl")
 
-CHANGED_HOURS, MAX_HOURS = 6.0, 48.0
+CHANGED_HOURS, MAX_HOURS = 1.0, 48.0
+# A board read at :50 of an hourly run is due at :50 of the next one, after that run
+# starts: read what falls due before this run's budget runs out, or 1 h becomes 2 h.
+DUE_EARLY_MINUTES = 45
 EMPTY_DAYS, DEAD_AFTER_DAYS, DEAD_RECHECK_DAYS = 7, 7, 30
 NEEDS_KNOWN = {"icims"}  # readers that skip postings the bank already holds unchanged
 
@@ -101,7 +104,7 @@ def crawl(bank: Any, http: Any, budget_s: float = 2400, limit: int = 50000, work
     """Every due board, one worker per API host, until the admission budget runs out."""
     run_id, deadline = bank.start_run("crawl"), time.monotonic() + budget_s
     groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-    for row in bank.due_boards(limit):
+    for row in bank.due_boards(limit, DUE_EARLY_MINUTES):
         groups[rate_host(row)].append(row)
     stats: Counter = Counter(due=sum(len(g) for g in groups.values()))
     lock = threading.Lock()
@@ -125,5 +128,9 @@ def crawl(bank: Any, http: Any, budget_s: float = 2400, limit: int = 50000, work
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         list(pool.map(work, groups.values()))
+    try:
+        stats["job_bank_touched"] = bank.touch_published()
+    except Exception:  # the site's rows age a day; the next run touches them
+        log.exception("job_bank rows could not be marked seen")
     bank.finish_run(run_id, dict(stats))
     return dict(stats)
