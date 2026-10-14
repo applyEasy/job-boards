@@ -4,7 +4,8 @@
 # checks the login works, stores BANK_DATABASE_URL as this repo's secret, turns
 # the crawl workflow on and starts the first discover run.
 #
-# Already applied sql/20261014_boards_bank.sql in the SQL editor? Then:
+# Already applied both sql/20261014_boards_bank.sql and
+# sql/20261014_bank_publish.sql in the SQL editor? Then:
 #   PROJECT_REF=<ref> POOLER_HOST=<Dashboard > Connect > Session pooler host> scripts/setup_bank.sh
 # It prints one `alter role` line to run in the SQL editor and waits for you.
 #
@@ -49,7 +50,8 @@ grant="alter role job_boards_crawler login password '$verifier';"
 
 if [[ -n ${DATABASE_URL:-} ]]; then
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$ROOT/sql/20261014_boards_bank.sql"
-  echo "migration applied"
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$ROOT/sql/20261014_bank_publish.sql"
+  echo "migrations applied"
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "$grant"
 else
   echo "Run this one line in the Supabase SQL editor (it holds only a hash of the new password):"
@@ -60,6 +62,16 @@ else
 fi
 
 url="postgresql://job_boards_crawler.$ref:$password@$pooler:5432/postgres"
+ready=$(psql "$url" -v ON_ERROR_STOP=1 -qtAc "
+  select (
+    to_regprocedure('public.bank_publish(jsonb)') is not null
+    and to_regprocedure('public.bank_unpublish(text[])') is not null
+    and to_regprocedure('public.bank_touch_published()') is not null
+  )::text")
+if [[ $ready != t ]]; then
+  echo "publishing migration is missing; apply sql/20261014_bank_publish.sql before enabling crawls." >&2
+  exit 1
+fi
 psql "$url" -v ON_ERROR_STOP=1 -qtAc "select 'crawler login works, boards so far: ' || count(*) from bank_boards"
 
 printf %s "$url" | $GH secret set BANK_DATABASE_URL -R "$REPO"
