@@ -128,4 +128,4 @@ class Bank:
 
     def stats(self) -> List[Dict[str, Any]]:
         return self.query("select provider, status, count(*) as boards, sum(open_postings) as open_postings, "
-                          "sum(fail_count > 0)::int as failing from bank_boards group by 1, 2 order by 1, 2")
+                          "count(*) filter (where fail_count > 0) as failing from bank_boards group by 1, 2 order by 1, 2")

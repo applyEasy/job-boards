@@ -28,7 +28,8 @@ def bank():
     with psycopg.connect(DSN, autocommit=True) as conn:
         conn.execute("do $$ begin if not exists (select 1 from pg_roles where rolname='anon') then "
                      "create role anon nologin; create role authenticated nologin; end if; end $$")
-        conn.execute((SQL / "20261014_boards_bank_ROLLBACK.sql").read_text())
+        # Tables only: the role may hold grants in another database of this cluster.
+        conn.execute("drop table if exists bank_postings, bank_boards, bank_cursors, bank_discovery, bank_runs")
         conn.execute((SQL / "20261014_boards_bank.sql").read_text())
     b = Bank(DSN)
     b.add_boards([(Board("greenhouse", "acme", "Acme"), "https://boards.greenhouse.io/acme", "test")])
@@ -121,3 +122,12 @@ def test_due_boards_are_oldest_first_and_skip_future_ones(bank):
     bank.add_boards([(Board("lever", "zoox"), "https://jobs.lever.co/zoox", "test")])
     bank.query("update bank_boards set next_check_at = now() + interval '1 day' where id = 'lever:zoox'")
     assert [b["id"] for b in bank.due_boards(10)] == ["greenhouse:acme"]
+
+
+def test_stats_counts_boards_postings_and_failing_ones(bank):
+    crawl_board(bank, the_board(bank), None, T0, read=reader_of(Listing([post(1), post(2)], True)))
+    bank.add_boards([(Board("lever", "zoox"), "https://jobs.lever.co/zoox", "test")])
+    crawl_board(bank, bank.query("select * from bank_boards where id = 'lever:zoox'")[0], None, T0,
+                read=reader_of(ReadFailed("HTTP 500")))
+    got = {(r["provider"], r["status"]): r for r in bank.stats()}
+    assert got[("greenhouse", "active")]["open_postings"] == 2 and got[("lever", "new")]["failing"] == 1
