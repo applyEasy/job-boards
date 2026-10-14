@@ -11,6 +11,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from jobboards.boards import Board
+from jobboards.publish import job_bank_rows
 from jobboards.readers import Posting
 
 _UPSERT = """
@@ -60,9 +61,9 @@ class Bank:
                 "on conflict (id) do nothing", [list(c) for c in columns])
             return cur.rowcount
 
-    def due_boards(self, limit: int) -> List[Dict[str, Any]]:
-        return self.query("select * from bank_boards where next_check_at <= now() order by next_check_at limit %s",
-                          (limit,))
+    def due_boards(self, limit: int, early_minutes: float = 0) -> List[Dict[str, Any]]:
+        return self.query("select * from bank_boards where next_check_at <= now() + make_interval(mins => %s) "
+                          "order by next_check_at limit %s", (early_minutes, limit))
 
     def stored(self, board_id: str) -> Dict[str, Tuple[str, bool]]:
         return {r["id"]: (r["content_hash"], r["open"]) for r in self.query(
@@ -92,9 +93,45 @@ class Bank:
                 self.conn.execute("update bank_postings set closed_at = %s, changed_at = %s "
                                   "where board_id = %s and id = any(%s) and closed_at is null",
                                   (now, now, board_id, closed))
+            if upserts:
+                # Publish only writes this board owns; another site's duplicate is ignored above.
+                owned = {r["id"] for r in self.conn.execute(
+                    "select id from bank_postings where board_id = %s and id = any(%s)",
+                    (board_id, [p.id for p in upserts]))}
+                upserts = list({p.id: p for p in upserts if p.id in owned}.values())
+            self._publish(upserts, closed)
             self._board_update(board_id, sched, ", last_error = null, last_ok_at = %s, list_hash = %s, open_postings = "
                                "(select count(*) from bank_postings where board_id = %s and closed_at is null)",
                                (now, list_hash, board_id))
+
+    def _publish(self, upserts: List[Posting], closed: List[str]) -> None:
+        """Same transaction as the bank write: the site never misses a change the bank took."""
+        rows = job_bank_rows(upserts)
+        if rows:
+            self.conn.execute("select bank_publish(%s)", (Jsonb(rows),))
+        published = {r["source_id"] for r in rows}
+        removed = list(dict.fromkeys([*closed, *(p.id for p in upserts if p.id[:300] not in published)]))
+        if removed:
+            self.conn.execute("select bank_unpublish(%s)", (removed,))
+
+    def publish_open(self, page: int = 5000) -> int:
+        """Every open posting the site would show, onto it: the catch-up for postings the bank
+        took before crawls published. A re-run rewrites the same rows."""
+        sent, after = 0, ""
+        while True:
+            batch = self.query("select id, source, company_name, title, url, locations, workplace, employment_type, "
+                               "apply_url, posted_at from bank_postings where closed_at is null and id > %s "
+                               "order by id limit %s", (after, page))
+            if not batch:
+                return sent
+            after = batch[-1]["id"]
+            rows = job_bank_rows([Posting(**{**r, "posted_at": r["posted_at"] and r["posted_at"].isoformat()})
+                                  for r in batch])
+            if rows:
+                sent += self.query("select bank_publish(%s) as n", (Jsonb(rows),))[0]["n"]
+
+    def touch_published(self) -> int:
+        return self.query("select bank_touch_published() as n")[0]["n"]
 
     def mark_unchanged(self, board_id: str, sched: Dict[str, Any], now: datetime) -> None:
         with self.lock:
@@ -104,8 +141,10 @@ class Bank:
         with self.lock, self.conn.transaction():
             dead = sched["status"] == "dead"
             if dead:  # the board is gone or has failed for a week: its postings come down
-                self.conn.execute("update bank_postings set closed_at = %s, changed_at = %s "
-                                  "where board_id = %s and closed_at is null", (now, now, board_id))
+                closed = [r["id"] for r in self.conn.execute(
+                    "update bank_postings set closed_at = %s, changed_at = %s "
+                    "where board_id = %s and closed_at is null returning id", (now, now, board_id))]
+                self._publish([], closed)
             self._board_update(board_id, sched, ", last_error = %s" + (", open_postings = 0" if dead else ""),
                                (error,))
 

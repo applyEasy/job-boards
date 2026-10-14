@@ -223,3 +223,100 @@ def test_icims_compares_lastmod_as_an_instant_not_as_text():
     known = {"ic-careers-gdms-75473": "2026-10-14T18:14:41+00:00", "ic-careers-gdms-74677": "2026-10-14T18:00:40+00:00"}
     listing, _ = read("icims", "careers-gdms.icims.com", _icims_routes(), known=known)
     assert listing.postings == [] and listing.keep == set(known)
+
+
+# --- careers sites on the employer's own domain (found from homepages) ---
+
+def _phenom_answer(jobs_override=None, total=None):
+    data = json.loads(fixture("phenom.json"))
+    jobs = data["refineSearch"]["data"]["jobs"]
+    if jobs_override:
+        jobs = jobs_override(jobs)
+        data["refineSearch"]["data"]["jobs"] = jobs
+    data["refineSearch"]["totalHits"] = len(jobs) if total is None else total
+    return json.dumps(data)
+
+
+def test_phenom_jobs_that_apply_on_workday_are_the_workday_posting():
+    routes = {"https://careers.conagrabrands.com/robots.txt": "User-agent: *\nDisallow: */px-widgets\n",
+              "https://careers.conagrabrands.com/widgets": _phenom_answer()}
+    listing, http = read("phenom", "careers.conagrabrands.com/us/en", routes, company="Conagra Brands")
+    assert listing.complete and len(listing.postings) == 3
+    p = listing.postings[0]
+    assert p.source == "ats_workday" and p.id == "wd-conagrabrands-maintenance-supervisor---3rd-shift_req-039646"
+    assert p.url == ("https://conagrabrands.wd1.myworkdayjobs.com/Careers_US/job/Russellville-Arkansas/"
+                     "Maintenance-Supervisor---3rd-Shift_Req-039646")
+    assert p.locations == ["Russellville, Arkansas, United States of America"] and p.employment_type == "Full time"
+    assert http.calls[1][2]["from"] == 0 and http.calls[1][2]["keywords"] == ""
+
+
+def test_phenom_jobs_that_apply_elsewhere_keep_the_careers_site_page():
+    def elsewhere(jobs):
+        return [{**j, "applyUrl": "https://example.taleo.net/careersection/apply"} for j in jobs]
+    routes = {"https://careers.conagrabrands.com/widgets": _phenom_answer(elsewhere)}
+    listing, _ = read("phenom", "careers.conagrabrands.com/us/en", routes)
+    p = listing.postings[0]
+    assert p.source == "ats_phenom" and p.id == "ph-careers.conagrabrands.com-req-039646"
+    assert p.url == "https://careers.conagrabrands.com/us/en/job/Req-039646"
+
+
+def test_phenom_short_of_its_total_is_incomplete():
+    listing, _ = read("phenom", "careers.conagrabrands.com/us/en",
+                      {"https://careers.conagrabrands.com/widgets": _phenom_answer(total=254)})
+    assert not listing.complete
+
+
+def test_jibe_jobs_that_apply_on_icims_are_the_icims_posting():
+    routes = {"https://careers.noblis.org/robots.txt": "User-agent: *\nAllow: /\ncrawl-delay: 5\n",
+              "https://careers.noblis.org/api/jobs": lambda url, _: json.dumps({**json.loads(fixture("jibe.json")), "totalCount": 3})}
+    http = FakeHttp(routes)
+    http.gaps = {}
+    listing = READERS["jibe"](Board("jibe", "careers.noblis.org", "Noblis"), http, {})
+    assert listing.complete and len(listing.postings) == 3
+    p = listing.postings[0]
+    assert p.source == "ats_icims" and p.id == "ic-jobs-noblis-27993" and p.title == "Budget / Financial Analyst"
+    assert p.url == "https://careers.noblis.org/jobs/27993" and p.locations == ["Bethesda, Maryland"]
+    assert http.gaps["careers.noblis.org"] == 5  # its robots.txt asks for 5 s between requests
+
+
+def test_successfactors_reads_rows_and_knows_its_total():
+    routes = {"https://jobs.lincolnelectric.com/robots.txt": "User-agent: *\nDisallow: /applybutton/\n",
+              "https://jobs.lincolnelectric.com/search/": fixture("successfactors.html").replace("of <b>248</b>", "of <b>3</b>")}
+    listing, _ = read("successfactors", "jobs.lincolnelectric.com", routes, company="Lincoln Electric")
+    assert listing.complete and len(listing.postings) == 3
+    p = listing.postings[0]
+    assert p.source == "ats_successfactors" and p.id == "sf-jobs.lincolnelectric.com-1436790033"
+    assert p.title == "Stockkeeper B" and p.locations == ["Cleveland, OH, US, 44117"]
+    assert p.department == "Distribution/Logistics" and p.posted_at == "2026-10-14"
+    assert p.url == "https://jobs.lincolnelectric.com/job/Cleveland-Stockkeeper-B-OH-44117/1436790033/"
+
+
+def test_successfactors_short_of_its_total_is_incomplete():
+    routes = {"https://jobs.lincolnelectric.com/search/": fixture("successfactors.html")}  # "of 248", 3 rows
+    listing, _ = read("successfactors", "jobs.lincolnelectric.com", routes)
+    assert len(listing.postings) == 3 and not listing.complete
+
+
+def test_an_employer_careers_site_that_robots_shuts_us_out_of_is_not_a_board():
+    routes = {"https://jobs.lincolnelectric.com/robots.txt": "User-agent: *\nDisallow: /search/\n"}
+    with pytest.raises(NotABoard):
+        read("successfactors", "jobs.lincolnelectric.com", routes)
+
+
+def test_successfactors_links_under_a_country_path_are_read():
+    page = fixture("successfactors.html").replace("of <b>248</b>", "of <b>3</b>").replace('href="/job/', 'href="/USA/job/')
+    listing, _ = read("successfactors", "jobs.lincolnelectric.com", {"https://jobs.lincolnelectric.com/search/": page})
+    assert len(listing.postings) == 3 and listing.complete
+    assert listing.postings[0].url == "https://jobs.lincolnelectric.com/USA/job/Cleveland-Stockkeeper-B-OH-44117/1436790033/"
+
+
+def test_jibe_listing_one_job_on_two_pages_is_still_complete(monkeypatch):
+    monkeypatch.setattr("jobboards.readers.JIBE_PAGE", 2)
+    jobs = json.loads(fixture("jibe.json"))["jobs"]
+    pages = {1: jobs[:2], 2: [jobs[1], jobs[2]]}  # job 2 shows on both pages: 4 rows, 3 jobs
+
+    def answer(url, _):
+        page = int(url.split("page=")[1].split("&")[0])
+        return json.dumps({"jobs": pages.get(page, []), "totalCount": 4})
+    listing, _ = read("jibe", "careers.noblis.org", {"https://careers.noblis.org/api/jobs": answer})
+    assert len(listing.postings) == 3 and listing.complete

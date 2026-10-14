@@ -1,0 +1,67 @@
+{
+ "refineSearch": {
+  "status": 200,
+  "hits": 3,
+  "totalHits": 254,
+  "data": {
+   "jobs": [
+    {
+     "jobId": "Req-039646",
+     "title": "Maintenance Supervisor - 3rd Shift",
+     "cityStateCountry": "Russellville, Arkansas, United States of America",
+     "multi_location": [
+      "Russellville, Arkansas, United States of America"
+     ],
+     "category": "Supply Chain & Manufacturing",
+     "type": "Full time",
+     "postedDate": "2026-08-18T00:00:00.000+0000",
+     "applyUrl": "https://conagrabrands.wd1.myworkdayjobs.com/Careers_US/job/Russellville-Arkansas/Maintenance-Supervisor---3rd-Shift_Req-039646/apply",
+     "jobSeqNo": "CXGCONUSREQ039646EXTERNALENUS",
+     "reqId": "Req-039646",
+     "dateCreated": "2026-08-12T15:50:23.132+0000"
+    },
+    {
+     "jobId": "Req-039848",
+     "title": "Production Supervisor - 2nd Shift",
+     "cityStateCountry": "Russellville, Arkansas, United States of America",
+     "multi_location": [
+      "Russellville, Arkansas, United States of America"
+     ],
+     "category": "Supply Chain & Manufacturing",
+     "type": "Full time",
+     "postedDate": "2026-08-21T00:00:00.000+0000",
+     "applyUrl": "https://conagrabrands.wd1.myworkdayjobs.com/Careers_US/job/Russellville-Arkansas/Production-Supervisor---2nd-Shift_Req-039848/apply",
+     "jobSeqNo": "CXGCONUSREQ039848EXTERNALENUS",
+     "reqId": "Req-039848",
+     "dateCreated": "2026-08-20T00:50:07.265+0000"
+    },
+    {
+     "jobId": "Req-039952",
+     "title": "Continuous Improvement Manager, Connected Worker",
+     "cityStateCountry": "Omaha, Nebraska, United States of America",
+     "multi_location": [
+      "Omaha, Nebraska, United States of America",
+      "Oakdale, California, United States of America",
+      "Marshall, Missouri, United States of America",
+      "Fayetteville, Arkansas, United States of America",
+      "Archbold, Ohio, United States of America",
+      "Troy, Ohio, United States of America",
+      "Darien, Wisconsin, United States of America",
+      "Russellville, Arkansas, United States of America",
+      "Council Bluffs, Iowa, United States of America",
+      "Imlay City, Michigan, United States of America",
+      "Chicago, Illinois, United States of America",
+      "Fort Madison, Iowa, United States of America"
+     ],
+     "category": "Supply Chain & Manufacturing",
+     "type": "Full time",
+     "postedDate": "2026-09-03T00:00:00.000+0000",
+     "applyUrl": "https://conagrabrands.wd1.myworkdayjobs.com/Careers_US/job/Omaha-Nebraska/Continuous-Improvement-Manager--Connected-Worker_Req-039952-1/apply",
+     "jobSeqNo": "CXGCONUSREQ039952EXTERNALENUS",
+     "reqId": "Req-039952",
+     "dateCreated": "2026-09-02T15:50:09.211+0000"
+    }
+   ]
+  }
+ }
+}

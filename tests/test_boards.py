@@ -33,6 +33,8 @@ def test_public_board_links_become_boards(url, provider, key):
     "https://greenhouse.io/stripe",
     "https://www.icims.com/careers",
     "https://cdn.icims.com/x",
+    "https://internal-acme.icims.com/jobs/1/x/job",
+    "https://franchise-acme.icims.com/jobs",
     "https://evil.com/boards.greenhouse.io/stripe",
     "https://boards.greenhouse.io.evil.com/stripe",
     "https://boards.greenhouse.io/",

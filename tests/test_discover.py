@@ -99,3 +99,71 @@ def test_commoncrawl_evidence_is_the_link_that_proved_the_board(monkeypatch):
     bank = FakeBank()
     from_commoncrawl(FakeHttp(_cc_routes()), bank, crawls=1)
     assert ("lever:zoox", "https://jobs.lever.co/zoox/1") in {(b.id, url) for b, url, _ in bank.added}
+
+
+# --- finding boards from an employer's homepage ---
+
+from jobboards.discover import boards_on_page, from_homepages, jobright_companies  # noqa: E402
+
+
+def test_a_page_names_its_boards_by_link_and_by_what_it_runs_on():
+    html = ('<a href="https://acme.wd5.myworkdayjobs.com/en-US/External/job/x_R1">jobs</a>'
+            '<script src="https://boards.greenhouse.io/embed/job_board/js?for=acme"></script>'
+            '<a href="https://www.icims.com/">powered by</a>')
+    assert {b.id for b in boards_on_page("https://acme.com/careers", html)} == {
+        "workday:acme.wd5.myworkdayjobs.com/external", "greenhouse:acme"}
+    phenom = '<script>window.phApp = {"widgetApiEndpoint":"https://careers.acme.com/widgets"}</script> phenompeople'
+    assert [b.id for b in boards_on_page("https://careers.acme.com/us/en/home", phenom)] == ["phenom:careers.acme.com/us/en"]
+    jibe = "<div>" + "jibe " * 6 + "</div>"
+    assert [b.id for b in boards_on_page("https://careers.acme.org/jobs", jibe)] == ["jibe:careers.acme.org"]
+    sf = '<a class="jobTitle-link" href="/job/x/1/">X</a> rmkcdn.successfactors.com'
+    assert [b.id for b in boards_on_page("https://jobs.acme.com/search/", sf)] == ["successfactors:jobs.acme.com"]
+
+
+def test_homepage_to_careers_page_to_board_with_the_company_name():
+    http = FakeHttp({
+        "https://acme.com/robots.txt": "User-agent: *\nDisallow: /private\n",
+        "https://acme.com/careers": '<iframe src="https://job-boards.greenhouse.io/acmeinc"></iframe>',
+        "https://acme.com": '<a href="/careers">Careers</a> <a href="/private/jobs">x</a>',
+    })
+    bank = FakeBank()
+    added = from_homepages(http, bank, [("Acme Inc", "https://acme.com", 12)], month="2026-10")
+    assert added == 1 and [(b.id, b.company_name, url) for b, url, _ in bank.added] == [
+        ("greenhouse:acmeinc", "Acme Inc", "https://acme.com/careers")]
+    assert ("homepage", "acme.com|2026-10") in bank.done
+
+
+def test_homepages_respect_robots_and_are_read_once_a_month():
+    http = FakeHttp({"https://acme.com/robots.txt": "User-agent: *\nDisallow: /\n",
+                     "https://acme.com": '<a href="https://jobs.lever.co/acme">jobs</a>'})
+    bank = FakeBank()
+    assert from_homepages(http, bank, [("Acme", "https://acme.com", 3)], month="2026-10") == 0
+    assert "https://acme.com" not in http.calls
+    bank = FakeBank(done={("homepage", "acme.com|2026-10")})
+    http = FakeHttp({})
+    from_homepages(http, bank, [("Acme", "https://acme.com", 3)], month="2026-10")
+    assert http.calls == []
+
+
+def test_jobright_lists_give_each_company_its_homepage_and_role_count():
+    readme = ("| Company | Job Title | Location | Work Model | Date Posted |\n| ----- | --------- | --------- | ---- | ------- |\n"
+              "| **[Acme](https://www.acme.com)** | **[SWE](https://jobright.ai/jobs/info/1)** | Austin, TX | On Site | Oct 14 |\n"
+              "| **↳** | **[SWE II](https://jobright.ai/jobs/info/2)** | Austin, TX | On Site | Oct 14 |\n"
+              "| **[Beta](http://beta.io)** | **[Intern](https://jobright.ai/jobs/info/3)** | Remote | Remote | Oct 14 |\n")
+    http = FakeHttp({"https://api.github.com/orgs/jobright-ai/repos": json.dumps(
+                         [{"name": "2026-Software-Engineer-New-Grad"}, {"name": "alibaba-MongoShake"}]),
+                     "https://raw.githubusercontent.com/jobright-ai/2026-Software-Engineer-New-Grad/HEAD/README.md": readme})
+    assert jobright_companies(http) == [("Acme", "https://www.acme.com", 2), ("Beta", "http://beta.io", 1)]
+    assert not any("MongoShake" in url for url in http.calls)
+
+
+def test_jobright_coverage_counts_roles_at_employers_the_bank_reads():
+    from jobboards.discover import jobright_coverage
+
+    class Bank:
+        def query(self, sql, params=()):
+            return [{"company_name": "Acme, Inc."}, {"company_name": "Gamma"}]
+    companies = [("Acme", "https://acme.com", 6), ("Beta LLC", "https://beta.io", 3), ("Gamma Group", "https://g.co", 1)]
+    got = jobright_coverage(Bank(), companies)
+    assert got["roles_total"] == 10 and got["roles_covered"] == 7 and got["percent"] == 70.0
+    assert got["companies_covered"] == 2 and got["top_missing"] == [["Beta LLC", 3]]
