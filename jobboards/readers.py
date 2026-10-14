@@ -421,6 +421,196 @@ def read_icims(board: Board, http: Any, known: Dict[str, Optional[str]]) -> List
     return Listing(out, complete=complete, keep=keep)
 
 
+# --- careers sites on the employer's own domain (found from homepages) ---
+
+PHENOM_PAGE, PHENOM_MAX = 100, 50000  # big retailers list 10-30k
+JIBE_PAGE, JIBE_MAX = 100, 50000
+SF_MAX_PAGES = 400
+_CRAWL_DELAY = re.compile(r"^\s*crawl-delay\s*:\s*([\d.]+)", re.I | re.M)
+_WORKDAY_APPLY = re.compile(r"^https://([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?([^/]+)/job/(.+?)(?:/apply)?/?$")
+_ICIMS_APPLY = re.compile(r"^https://([a-z0-9-]+)\.icims\.com/jobs/(\d+)", re.I)
+
+
+def _site_rules(host: str, http: Any, path: str) -> None:
+    """An employer careers site: robots.txt must let us read `path`; its crawl-delay sets our gap."""
+    robots = http.get(f"https://{host}/robots.txt")
+    if robots.status_code == 429 or robots.status_code >= 500:
+        raise ReadFailed(f"robots.txt answered {robots.status_code}")
+    text = robots.text if robots.status_code == 200 else ""
+    if not _robots_allows(_robots_rules(text), path):
+        raise NotABoard(f"robots.txt disallows {path}")
+    delay = _CRAWL_DELAY.search(text)
+    if delay and hasattr(http, "gaps"):
+        http.gaps[host] = min(10.0, max(http.gaps.get(host, 0.0), float(delay.group(1))))
+
+
+def _workday_posting(apply_url: str) -> Optional[tuple]:
+    """(id, url) of the Workday posting an Apply link opens, keyed the way read_workday keys it."""
+    m = _WORKDAY_APPLY.match((apply_url or "").strip())
+    if not m:
+        return None
+    tenant, dc, site, rest = m.groups()
+    return f"wd-{tenant}-{_workday_job_id(rest)}", f"https://{tenant}.{dc}.myworkdayjobs.com/{site}/job/{rest}"
+
+
+def read_phenom(board: Board, http: Any, known: Dict[str, Optional[str]]) -> Listing:
+    host, country, lang = (board.key.split("/") + ["us", "en"])[:3]
+    _site_rules(host, http, "/widgets")
+    out, seen = [], set()
+    total: Optional[int] = None
+    offset, complete = 0, True
+    while True:
+        if offset >= PHENOM_MAX:
+            complete = False
+            break
+        data = _json(http.post(f"https://{host}/widgets", json={
+            "lang": f"{lang}_{country}", "deviceType": "desktop", "country": country, "pageName": "search-results",
+            "ddoKey": "refineSearch", "sortBy": "", "subsearch": "", "from": offset, "jobs": True, "counts": True,
+            "all_fields": [], "size": PHENOM_PAGE, "clearAll": False, "jdsource": "facets", "isSliderEnable": False,
+            "pageId": "page20", "siteType": "external", "keywords": "", "global": True, "selected_fields": {},
+            "locationData": {}}), gone=(404,) if offset == 0 else ())
+        search = data.get("refineSearch") if isinstance(data, dict) else None
+        jobs = ((search or {}).get("data") or {}).get("jobs") if isinstance(search, dict) else None
+        if not isinstance(jobs, list):
+            if total is None:
+                raise ReadFailed("not a Phenom listing")
+            complete = False
+            break
+        if total is None:
+            total = int(search.get("totalHits") or 0)
+        before = len(seen)
+        for j in jobs:
+            job_id = str(j.get("jobId") or "") if isinstance(j, dict) else ""
+            if not job_id or job_id in seen or not _text(j.get("title")):
+                continue
+            seen.add(job_id)
+            workday = _workday_posting(j.get("applyUrl") or "")
+            posting_id, source, url = (workday[0], "ats_workday", workday[1]) if workday else (
+                f"ph-{host.lower()}-{job_id.lower()}", "ats_phenom", f"https://{host}/{country}/{lang}/job/{job_id}")
+            out.append(Posting(
+                id=posting_id, source=source, company_name=_company(board), title=_text(j["title"]), url=url,
+                locations=_places(j.get("multi_location") or [j.get("cityStateCountry")]),
+                employment_type=_text(j.get("type")), department=_text(j.get("category")),
+                posted_at=j.get("postedDate") or j.get("dateCreated"),
+            ))
+        offset += len(jobs)
+        if jobs and len(seen) == before:  # a page of nothing new: the site isn't paging
+            complete = False
+            break
+        if len(jobs) < PHENOM_PAGE or offset >= total:
+            break
+    return Listing(out, complete=complete and offset >= (total or 0))
+
+
+def read_jibe(board: Board, http: Any, known: Dict[str, Optional[str]]) -> Listing:
+    host = board.key
+    _site_rules(host, http, "/api/jobs")
+    out, seen = [], set()
+    total: Optional[int] = None
+    page, rows, complete = 1, 0, True
+    while True:
+        if (page - 1) * JIBE_PAGE >= JIBE_MAX:
+            complete = False
+            break
+        data = _json(http.get(f"https://{host}/api/jobs?limit={JIBE_PAGE}&page={page}&internal=false"),
+                     gone=(404,) if page == 1 else ())
+        jobs = data.get("jobs") if isinstance(data, dict) else None
+        if not isinstance(jobs, list):
+            if total is None:
+                raise ReadFailed("not a Jibe listing")
+            complete = False
+            break
+        if total is None:
+            total = int(data.get("totalCount") or data.get("count") or 0)
+        rows += len(jobs)
+        before = len(seen)
+        for item in jobs:
+            j = item.get("data") if isinstance(item, dict) else None
+            slug = str((j or {}).get("slug") or "")
+            if not slug or slug in seen or not _text(j.get("title")):
+                continue
+            seen.add(slug)
+            icims = _ICIMS_APPLY.match(j.get("apply_url") or "")
+            posting_id, source = (f"ic-{icims.group(1).lower()}-{icims.group(2)}", "ats_icims") if icims else (
+                f"jibe-{host.lower()}-{slug.lower()}", "ats_jibe")
+            out.append(Posting(
+                id=posting_id, source=source, company_name=_company(board, j.get("hiring_organization")),
+                title=_text(j["title"]), url=f"https://{host}/jobs/{slug}",
+                locations=_places([j.get("full_location")] + list(j.get("additional_locations") or [])),
+                employment_type=_text(j.get("employment_type")), department=_text(j.get("department")),
+                posted_at=j.get("posted_date"), source_updated_at=j.get("update_date"),
+            ))
+        if jobs and len(seen) == before:  # a page of nothing new: the site isn't paging
+            complete = False
+            break
+        if len(jobs) < JIBE_PAGE or rows >= total:
+            break
+        page += 1
+    return Listing(out, complete=complete and rows >= (total or 0))
+
+
+_SF_ROW = re.compile(r'<tr class="data-row".*?</tr>', re.S)
+_SF_PATH = r'(/(?:[^"/]+/)*job/[^"]*?/(\d+)/?)'  # /job/... or under a country path, /USA/job/...
+_SF_LINK = re.compile(rf'<a[^>]*href="{_SF_PATH}"[^>]*class="jobTitle-link"[^>]*>([^<]+)</a>'
+                      rf'|<a[^>]*class="jobTitle-link"[^>]*href="{_SF_PATH}"[^>]*>([^<]+)</a>')
+_SF_SPAN = lambda name: re.compile(rf'<span class="{name}">\s*([^<]*?)\s*</span>')
+_SF_PLACE, _SF_DEPT, _SF_DATE = _SF_SPAN("jobLocation"), _SF_SPAN("jobDepartment"), re.compile(
+    r'<span class="jobDate[^"]*">\s*([^<]*?)\s*</span>')
+_SF_TOTAL = re.compile(r'paginationLabel.*?of\s*(?:<b>)?\s*([\d,]+)', re.S)
+
+
+def read_successfactors(board: Board, http: Any, known: Dict[str, Optional[str]]) -> Listing:
+    import html as html_lib
+    host = board.key
+    _site_rules(host, http, "/search/")
+    out, seen = [], set()
+    total: Optional[int] = None
+    startrow, complete = 0, True
+    for _ in range(SF_MAX_PAGES):
+        reply = http.get(f"https://{host}/search/?q=&startrow={startrow}")
+        if reply.status_code == 404 and startrow == 0:
+            raise NotABoard("HTTP 404")
+        if reply.status_code != 200:
+            raise ReadFailed(f"HTTP {reply.status_code}")
+        page = reply.text
+        rows = _SF_ROW.findall(page)
+        before = len(seen)
+        if total is None:
+            m = _SF_TOTAL.search(page)
+            if not m and not rows:
+                raise ReadFailed("not a SuccessFactors search page")
+            total = int(m.group(1).replace(",", "")) if m else None
+        for row in rows:
+            link = _SF_LINK.search(row)
+            if not link:
+                continue
+            path, job_id, title = (link.group(1), link.group(2), link.group(3)) if link.group(1) else (
+                link.group(4), link.group(5), link.group(6))
+            if job_id in seen:
+                continue
+            seen.add(job_id)
+            place, dept, day = _SF_PLACE.search(row), _SF_DEPT.search(row), _SF_DATE.search(row)
+            try:
+                posted = datetime.strptime(" ".join(day.group(1).split()), "%b %d, %Y").date().isoformat() if day else None
+            except ValueError:
+                posted = None
+            out.append(Posting(
+                id=f"sf-{host.lower()}-{job_id}", source="ats_successfactors", company_name=_company(board),
+                title=_text(html_lib.unescape(title)), url=f"https://{host}{path}",
+                locations=_places([html_lib.unescape(place.group(1))] if place else []),
+                department=_text(html_lib.unescape(dept.group(1))) if dept else None, posted_at=posted,
+            ))
+        startrow += len(rows)
+        if rows and len(seen) == before:  # a page of nothing new: the site isn't paging
+            complete = False
+            break
+        if not rows or total is None or startrow >= total:
+            break
+    else:
+        complete = False
+    return Listing(out, complete=complete and total is not None and startrow >= total)
+
+
 READERS: Dict[str, Reader] = {
     "greenhouse": read_greenhouse,
     "lever": read_lever,
@@ -429,4 +619,7 @@ READERS: Dict[str, Reader] = {
     "workday": read_workday,
     "oracle": read_oracle,
     "icims": read_icims,
+    "phenom": read_phenom,
+    "jibe": read_jibe,
+    "successfactors": read_successfactors,
 }

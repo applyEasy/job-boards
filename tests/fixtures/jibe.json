@@ -1,0 +1,765 @@
+{
+ "locations": [],
+ "totalCount": 230,
+ "request_id": false,
+ "meta_data": false,
+ "count": 230,
+ "languageCounts": {
+  "en-us": {
+   "displayName": "English",
+   "count": 230
+  }
+ },
+ "filter": {
+  "facetList": {
+   "tags1": [
+    {
+     "term": "Hybrid",
+     "count": 85
+    },
+    {
+     "term": "On-site",
+     "count": 140
+    },
+    {
+     "term": "Remote",
+     "count": 5
+    }
+   ],
+   "tags2": [
+    {
+     "term": "Acquisition",
+     "count": 4
+    },
+    {
+     "term": "Artificial Intelligence",
+     "count": 4
+    },
+    {
+     "term": "Business Development/Capture",
+     "count": 1
+    },
+    {
+     "term": "Business Process",
+     "count": 3
+    },
+    {
+     "term": "Business Systems",
+     "count": 1
+    },
+    {
+     "term": "CBRN Engineering",
+     "count": 6
+    },
+    {
+     "term": "Client Training",
+     "count": 5
+    },
+    {
+     "term": "Configuration/Release",
+     "count": 4
+    },
+    {
+     "term": "Contracts",
+     "count": 1
+    },
+    {
+     "term": "Cyber Information Assurance",
+     "count": 1
+    },
+    {
+     "term": "Cyber Security Engineering",
+     "count": 6
+    },
+    {
+     "term": "Data Analysis/Data Analytics",
+     "count": 9
+    },
+    {
+     "term": "Data Science",
+     "count": 5
+    },
+    {
+     "term": "Database Engineering",
+     "count": 3
+    },
+    {
+     "term": "DevOps",
+     "count": 2
+    },
+    {
+     "term": "Electronic Engineering",
+     "count": 6
+    },
+    {
+     "term": "Engineering Technical Operations",
+     "count": 6
+    },
+    {
+     "term": "Environmental Science & Engineering",
+     "count": 8
+    },
+    {
+     "term": "Executive Assistance",
+     "count": 1
+    },
+    {
+     "term": "Govt Finance Budget & Investment Planning",
+     "count": 4
+    },
+    {
+     "term": "Graphics & Media Design",
+     "count": 1
+    },
+    {
+     "term": "Information Technology Generalist",
+     "count": 2
+    },
+    {
+     "term": "Intelligence",
+     "count": 6
+    },
+    {
+     "term": "Logistics",
+     "count": 4
+    },
+    {
+     "term": "Machine Learning",
+     "count": 2
+    },
+    {
+     "term": "Marketing & Communications",
+     "count": 2
+    },
+    {
+     "term": "Mechanical Engineering",
+     "count": 4
+    },
+    {
+     "term": "Policy Analysis",
+     "count": 1
+    },
+    {
+     "term": "Program Management",
+     "count": 1
+    },
+    {
+     "term": "Project Analysis Non-Technical",
+     "count": 9
+    },
+    {
+     "term": "Project Analysis Technical",
+     "count": 18
+    },
+    {
+     "term": "Project Management Technical",
+     "count": 16
+    },
+    {
+     "term": "Project Planning & Control",
+     "count": 1
+    },
+    {
+     "term": "Satellite & Space Systems Engineering",
+     "count": 3
+    },
+    {
+     "term": "Science",
+     "count": 4
+    },
+    {
+     "term": "Software Development/Engineering",
+     "count": 21
+    },
+    {
+     "term": "Solutions Architecture",
+     "count": 2
+    },
+    {
+     "term": "Systems Administration",
+     "count": 4
+    },
+    {
+     "term": "Systems Architecture",
+     "count": 2
+    },
+    {
+     "term": "Systems Engineering",
+     "count": 29
+    },
+    {
+     "term": "Technical Writing & Editing",
+     "count": 3
+    },
+    {
+     "term": "Telecommunications/Communications Engineering",
+     "count": 2
+    },
+    {
+     "term": "Test Engineering",
+     "count": 10
+    },
+    {
+     "term": "Transportation Engineering & Planning",
+     "count": 1
+    },
+    {
+     "term": "User Experience Engineering",
+     "count": 2
+    }
+   ],
+   "tags3": [
+    {
+     "term": "Defense",
+     "count": 22
+    },
+    {
+     "term": "ESI Homeland Security",
+     "count": 16
+    },
+    {
+     "term": "ESI Intel & Law Enforcement",
+     "count": 29
+    },
+    {
+     "term": "Federal Civilian Solutions",
+     "count": 26
+    },
+    {
+     "term": "Intel & Law Enforcement",
+     "count": 37
+    },
+    {
+     "term": "MSD Defense",
+     "count": 99
+    },
+    {
+     "term": "Shared Services",
+     "count": 1
+    }
+   ],
+   "tags5": [
+    {
+     "term": "Interim Secret",
+     "count": 18
+    },
+    {
+     "term": "None",
+     "count": 27
+    },
+    {
+     "term": "Public Trust",
+     "count": 2
+    },
+    {
+     "term": "Secret",
+     "count": 74
+    },
+    {
+     "term": "Suitability",
+     "count": 5
+    },
+    {
+     "term": "Top Secret",
+     "count": 27
+    },
+    {
+     "term": "TS/SCI",
+     "count": 13
+    },
+    {
+     "term": "TS/SCI with CI Polygraph",
+     "count": 31
+    },
+    {
+     "term": "TS/SCI with Polygraph",
+     "count": 33
+    }
+   ]
+  },
+  "displayLimit": 10,
+  "brands": {
+   "all": [
+    {
+     "brand": "Noblis",
+     "numJobs": 230
+    }
+   ],
+   "shortlist": [
+    {
+     "brand": "Noblis",
+     "numJobs": 230
+    }
+   ]
+  },
+  "categories": {
+   "all": [],
+   "shortlist": []
+  },
+  "locations": {
+   "all": [
+    {
+     "city": "Albuquerque",
+     "state": "New Mexico",
+     "country": "United States",
+     "count": 15
+    },
+    {
+     "city": "Arlington",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 17
+    },
+    {
+     "city": "Atlantic City",
+     "state": "New Jersey",
+     "country": "United States",
+     "count": 7
+    },
+    {
+     "city": "Barksdale AFB",
+     "state": "Louisiana",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Bethesda",
+     "state": "Maryland",
+     "country": "United States",
+     "count": 26
+    },
+    {
+     "city": "Chantilly",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 19
+    },
+    {
+     "city": "Charleston",
+     "state": "South Carolina",
+     "country": "United States",
+     "count": 2
+    },
+    {
+     "city": "Colorado Springs",
+     "state": "Colorado",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Corpus Christi",
+     "state": "Texas",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Dayton",
+     "state": "Ohio",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Ft Belvoir",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 3
+    },
+    {
+     "city": "Groton",
+     "state": "Connecticut",
+     "country": "United States",
+     "count": 6
+    },
+    {
+     "city": "Hampton Roads",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Herndon",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Hickam Field",
+     "state": "Hawaii",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Huntsville",
+     "state": "Alabama",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Hurlburt Field",
+     "state": "Florida",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Irving",
+     "state": "Texas",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Las Cruces",
+     "state": "New Mexico",
+     "country": "United States",
+     "count": 2
+    },
+    {
+     "city": "Lorton",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 7
+    },
+    {
+     "city": "McLean",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 6
+    },
+    {
+     "city": "Newport",
+     "state": "Rhode Island",
+     "country": "United States",
+     "count": 7
+    },
+    {
+     "city": "Norfolk",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 8
+    },
+    {
+     "city": "Oklahoma City",
+     "state": "Oklahoma",
+     "country": "United States",
+     "count": 2
+    },
+    {
+     "city": "Philadelphia",
+     "state": "Pennsylvania",
+     "country": "United States",
+     "count": 16
+    },
+    {
+     "city": "Reno",
+     "state": "Nevada",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Reston",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 14
+    },
+    {
+     "city": "San Diego",
+     "state": "California",
+     "country": "United States",
+     "count": 21
+    },
+    {
+     "city": "Seattle",
+     "state": "Washington",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Springfield",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 2
+    },
+    {
+     "city": "St Louis",
+     "state": "Missouri",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Washington",
+     "state": "Washington, DC",
+     "country": "United States",
+     "count": 47
+    },
+    {
+     "city": "Wilkes-Barre",
+     "state": "Pennsylvania",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": null,
+     "state": null,
+     "country": "United States",
+     "count": 9
+    }
+   ],
+   "shortlist": [
+    {
+     "city": "Albuquerque",
+     "state": "New Mexico",
+     "country": "United States",
+     "count": 15
+    },
+    {
+     "city": "Arlington",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 17
+    },
+    {
+     "city": "Atlantic City",
+     "state": "New Jersey",
+     "country": "United States",
+     "count": 7
+    },
+    {
+     "city": "Barksdale AFB",
+     "state": "Louisiana",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Bethesda",
+     "state": "Maryland",
+     "country": "United States",
+     "count": 26
+    },
+    {
+     "city": "Chantilly",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 19
+    },
+    {
+     "city": "Charleston",
+     "state": "South Carolina",
+     "country": "United States",
+     "count": 2
+    },
+    {
+     "city": "Colorado Springs",
+     "state": "Colorado",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Corpus Christi",
+     "state": "Texas",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Dayton",
+     "state": "Ohio",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Ft Belvoir",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 3
+    },
+    {
+     "city": "Groton",
+     "state": "Connecticut",
+     "country": "United States",
+     "count": 6
+    },
+    {
+     "city": "Hampton Roads",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Herndon",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Hickam Field",
+     "state": "Hawaii",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Huntsville",
+     "state": "Alabama",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Hurlburt Field",
+     "state": "Florida",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Irving",
+     "state": "Texas",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Las Cruces",
+     "state": "New Mexico",
+     "country": "United States",
+     "count": 2
+    },
+    {
+     "city": "Lorton",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 7
+    },
+    {
+     "city": "McLean",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 6
+    },
+    {
+     "city": "Newport",
+     "state": "Rhode Island",
+     "country": "United States",
+     "count": 7
+    },
+    {
+     "city": "Norfolk",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 8
+    },
+    {
+     "city": "Oklahoma City",
+     "state": "Oklahoma",
+     "country": "United States",
+     "count": 2
+    },
+    {
+     "city": "Philadelphia",
+     "state": "Pennsylvania",
+     "country": "United States",
+     "count": 16
+    },
+    {
+     "city": "Reno",
+     "state": "Nevada",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Reston",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 14
+    },
+    {
+     "city": "San Diego",
+     "state": "California",
+     "country": "United States",
+     "count": 21
+    },
+    {
+     "city": "Seattle",
+     "state": "Washington",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Springfield",
+     "state": "Virginia",
+     "country": "United States",
+     "count": 2
+    },
+    {
+     "city": "St Louis",
+     "state": "Missouri",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": "Washington",
+     "state": "Washington, DC",
+     "country": "United States",
+     "count": 47
+    },
+    {
+     "city": "Wilkes-Barre",
+     "state": "Pennsylvania",
+     "country": "United States",
+     "count": 1
+    },
+    {
+     "city": null,
+     "state": null,
+     "country": "United States",
+     "count": 9
+    }
+   ]
+  },
+  "experienceLevels": {
+   "all": [],
+   "shortlist": []
+  }
+ },
+ "jobs": [
+  {
+   "data": {
+    "slug": "27993",
+    "req_id": "27993",
+    "title": "Budget / Financial Analyst",
+    "full_location": "Bethesda, Maryland",
+    "additional_locations": null,
+    "employment_type": "FULL_TIME",
+    "category": [],
+    "posted_date": "2026-10-14T18:21:00+0000",
+    "update_date": "2026-10-14T18:22:45+0000",
+    "apply_url": "https://jobs-noblis.icims.com/jobs/27993/login",
+    "country_code": "US"
+   }
+  },
+  {
+   "data": {
+    "slug": "27991",
+    "req_id": "27991",
+    "title": "Data Management and Automation Analyst",
+    "full_location": "Bethesda, Maryland",
+    "additional_locations": null,
+    "employment_type": "FULL_TIME",
+    "category": [],
+    "posted_date": "2026-10-14T18:21:00+0000",
+    "update_date": "2026-10-14T18:22:45+0000",
+    "apply_url": "https://jobs-noblis.icims.com/jobs/27991/login",
+    "country_code": "US"
+   }
+  },
+  {
+   "data": {
+    "slug": "27990",
+    "req_id": "27990",
+    "title": "Contracts Specialist",
+    "full_location": "Bethesda, Maryland",
+    "additional_locations": null,
+    "employment_type": "FULL_TIME",
+    "category": [],
+    "posted_date": "2026-10-14T18:21:00+0000",
+    "update_date": "2026-10-14T18:21:45+0000",
+    "apply_url": "https://jobs-noblis.icims.com/jobs/27990/login",
+    "country_code": "US"
+   }
+  }
+ ]
+}

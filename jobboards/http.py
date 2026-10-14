@@ -32,6 +32,7 @@ class Reply:
     status_code: int
     headers: Dict[str, str]
     content: bytes = field(repr=False)
+    url: str = ""  # where redirects ended
 
     @property
     def text(self) -> str:
@@ -93,6 +94,6 @@ class Http:
                 if len(body) > self.max_bytes:
                     raise TooLarge(f"{url} is over {self.max_bytes} bytes")
             resp.close()
-            return Reply(resp.status_code, dict(resp.headers), bytes(body))
+            return Reply(resp.status_code, dict(resp.headers), bytes(body), str(getattr(resp, "url", "") or url))
         finally:
             self._last[host] = self.clock()
