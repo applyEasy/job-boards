@@ -110,6 +110,23 @@ create policy crawler_all on public.bank_postings  for all to job_boards_crawler
 create policy crawler_all on public.bank_discovery for all to job_boards_crawler using (true) with check (true);
 create policy crawler_all on public.bank_runs      for all to job_boards_crawler using (true) with check (true);
 
+-- Backend's nightly ingest calls this (service role, PostgREST rpc) after it
+-- has applied the bank's changes: every live job_bank row whose bank posting
+-- is still open counts as seen tonight, so the stale sweep ages only rows the
+-- bank doesn't hold. plpgsql so this file also applies where job_bank is absent.
+create or replace function public.bank_touch_job_bank() returns integer
+language plpgsql security definer set search_path = public as $$
+declare touched integer;
+begin
+  update public.job_bank j set last_seen_at = now()
+  from public.bank_postings b
+  where b.id = j.source_id and b.source = j.source and b.closed_at is null and j.is_active;
+  get diagnostics touched = row_count;
+  return touched;
+end $$;
+revoke all on function public.bank_touch_job_bank() from public, anon, authenticated;
+grant execute on function public.bank_touch_job_bank() to service_role;
+
 commit;
 
 -- Then, once, with a password you generate (e.g. `openssl rand -hex 24`):
