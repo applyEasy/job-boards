@@ -9,7 +9,7 @@ board is read.
 - **Find** (`discover`, daily): boards come only from public links on an exact
   job-platform host (never a guessed slug): the pinned LastRound ATS directory,
   the public GitHub job lists, Common Crawl's index (resumable page by page),
-  and links inside postings already in the bank.
+  links inside postings already in the bank, and employer homepages from the public job lists.
 - **Read** (`crawl`, hourly): the boards that are due, one worker per API host,
   politely spaced. A board whose listing hasn't changed writes nothing. New,
   edited and relisted postings are written; postings a *complete* listing
@@ -22,7 +22,7 @@ board is read.
   also marks the live rows the bank still holds as seen, once a day each, so
   Backend's 7-day stale sweep leaves them up.
 - **Platforms**: Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Oracle
-  Recruiting Cloud, iCIMS. Posting ids are job_bank's own `source_id`s
+  Recruiting Cloud, iCIMS, Phenom, Jibe, and SuccessFactors. Posting ids are job_bank's own `source_id`s
   (`gh-<slug>-<id>`, `wd-<tenant>-<slug_req>`, ...).
 
 ## Setup (once)

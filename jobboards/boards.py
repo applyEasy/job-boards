@@ -91,5 +91,6 @@ def board_from_url(url: str) -> Optional[Board]:
 
     if host.endswith(".icims.com") and host.count(".") == 2:
         sub = host.split(".")[0]
-        return None if sub in _ICIMS_NOT_PORTALS else Board("icims", host)
+        public = sub not in _ICIMS_NOT_PORTALS and not sub.startswith(("internal", "franchise"))  # staff-only portals
+        return Board("icims", host) if public else None
     return None
