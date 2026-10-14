@@ -18,3 +18,8 @@ def test_heartbeat_follows_finished_crawl_runs_and_never_doubles_up():
     assert 'select(.status != "completed")' in text  # nothing queued while a run waits or works
     assert 'select(.displayTitle == "discover")' in text
     assert "gh workflow run crawl.yml -f command=" in text
+
+
+def test_heartbeat_starts_the_daily_coverage_report_with_the_daily_discover():
+    text = (WORKFLOWS / "heartbeat.yml").read_text()
+    assert 'if [ "$next" = discover ]; then gh workflow run jobright-coverage.yml; fi' in text
