@@ -1,0 +1,39 @@
+# Scheduled and manual runs only: the bank's secret is never exposed to pull requests.
+name: crawl
+on:
+  schedule:
+    - cron: "23 * * * *"   # read the boards that are due
+    - cron: "41 6 * * *"   # find new boards
+  workflow_dispatch:
+    inputs:
+      command:
+        type: choice
+        options: [crawl, discover, stats]
+        default: crawl
+permissions:
+  contents: read
+concurrency:
+  group: bank-writer
+  cancel-in-progress: false
+jobs:
+  run:
+    if: github.repository == 'applyEasy/job-boards'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install .
+      - name: Run
+        env:
+          BANK_DATABASE_URL: ${{ secrets.BANK_DATABASE_URL }}
+          COMMAND: ${{ inputs.command }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ -z "$COMMAND" ]; then
+            if [ "$SCHEDULE" = "41 6 * * *" ]; then COMMAND=discover; else COMMAND=crawl; fi
+          fi
+          python -m jobboards "$COMMAND"
