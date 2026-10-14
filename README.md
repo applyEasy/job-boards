@@ -43,6 +43,18 @@ Rollback: disable the workflow; first `sql/20261014_bank_publish_ROLLBACK.sql`
 stops the `job_bank` writes, `sql/20261014_boards_bank_ROLLBACK.sql` drops
 the tables and the role.
 
+## Jobright coverage gate
+
+`.github/workflows/jobright-coverage.yml` measures the share of Jobright-listed
+roles whose employer has an active board with open postings in the bank. It runs
+daily and after a trusted push to `main`, validates the report, and keeps the
+credential-free JSON as a 30-day artifact. The database URL remains only in the
+workflow environment; pull requests never receive it.
+
+This report is read-only evidence, not permission to turn Jobright off. Review
+`top_missing` and confirm direct posting twins before changing Backend's
+Jobright source setting.
+
 ## Run locally
 
 ```bash

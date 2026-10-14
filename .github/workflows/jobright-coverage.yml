@@ -1,0 +1,68 @@
+name: Jobright coverage gate
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 8 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: bank-coverage
+  cancel-in-progress: true
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install .
+      - name: Generate read-only coverage report
+        env:
+          BANK_DATABASE_URL: ${{ secrets.BANK_DATABASE_URL }}
+        run: |
+          REPORT="$RUNNER_TEMP/jobright-coverage.json"
+          python -m jobboards jobright-coverage > "$REPORT"
+      - name: Validate and summarize report
+        env:
+          REPORT: ${{ runner.temp }}/jobright-coverage.json
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          report = json.load(open(os.environ["REPORT"]))
+          required = {"roles_total", "roles_covered", "percent", "companies_total",
+                      "companies_covered", "top_missing"}
+          missing = sorted(required - report.keys())
+          if missing:
+              raise SystemExit(f"coverage report is missing: {', '.join(missing)}")
+          if report["roles_total"] <= 0:
+              raise SystemExit("coverage report has no Jobright roles")
+          if not 0 <= report["roles_covered"] <= report["roles_total"]:
+              raise SystemExit("coverage report role counts are inconsistent")
+          if not 0 <= report["percent"] <= 100:
+              raise SystemExit("coverage report percent is outside 0..100")
+
+          summary = (
+              "## Jobright replacement coverage\n\n"
+              f"- Roles covered: {report['roles_covered']:,} / {report['roles_total']:,} "
+              f"({report['percent']:.2f}%)\n"
+              f"- Companies covered: {report['companies_covered']:,} / "
+              f"{report['companies_total']:,}\n\n"
+              "This is read-only evidence. It does not approve a broad Jobright shutdown.\n"
+          )
+          print(summary)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+              out.write(summary)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jobright-coverage-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/jobright-coverage.json
+          if-no-files-found: error
+          retention-days: 30
