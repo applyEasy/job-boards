@@ -19,8 +19,6 @@ posting on a board is stored.
   Recruiting Cloud, iCIMS. Posting ids are job_bank's own `source_id`s
   (`gh-<slug>-<id>`, `wd-<tenant>-<slug_req>`, ...).
 
-Design: [docs/superpowers/specs/2026-10-14-job-boards-design.md](docs/superpowers/specs/2026-10-14-job-boards-design.md)
-
 ## Setup (once)
 
 1. Apply `sql/20261014_boards_bank.sql` to the Supabase database (SQL editor
