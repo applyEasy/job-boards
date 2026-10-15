@@ -1,24 +1,47 @@
 # Scheduled and manual runs only: the bank's secret is never exposed to pull requests.
 name: crawl
-run-name: ${{ inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || 'crawl' }}
+run-name: ${{ inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || (github.event.schedule == '53 * * * *' && 'resolve') || 'crawl' }}
 on:
   schedule:
     - cron: "23 * * * *"   # read the boards that are due
-    - cron: "41 6 * * *"   # find new boards
+    - cron: "41 6 * * *"   # find new boards from the quick sources (the boards lane does the slow ones)
+    - cron: "53 * * * *"   # give homepage-only Jobright rows the employer's posting
   workflow_dispatch:
     inputs:
       command:
         type: choice
-        options: [crawl, discover, resolve, publish, stats, jobright-coverage]
+        options: [crawl, discover, boards, resolve, find, publish, stats, jobright-coverage]
         default: crawl
 permissions:
   contents: read
+# One queue per kind of run, so a resolve never waits behind a two-hour crawl; two runs of
+# one kind never overlap (one crawl at a time writes postings).
 concurrency:
-  group: bank-writer
+  group: bank-${{ inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || (github.event.schedule == '53 * * * *' && 'resolve') || 'crawl' }}
   cancel-in-progress: false
 jobs:
+  # A crawl is four crawlers side by side, each reading its own hosts' boards (jobboards/crawl.py in_shard).
+  crawl:
+    if: github.repository == 'applyEasy/job-boards' && (inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || (github.event.schedule == '53 * * * *' && 'resolve') || 'crawl') == 'crawl'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install .
+      - name: Crawl shard ${{ matrix.shard }} of 4
+        env:
+          BANK_DATABASE_URL: ${{ secrets.BANK_DATABASE_URL }}
+        run: python -m jobboards crawl --shard ${{ matrix.shard }} --shards 4
   run:
-    if: github.repository == 'applyEasy/job-boards'
+    if: github.repository == 'applyEasy/job-boards' && (inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || (github.event.schedule == '53 * * * *' && 'resolve') || 'crawl') != 'crawl'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -31,10 +54,16 @@ jobs:
       - name: Run
         env:
           BANK_DATABASE_URL: ${{ secrets.BANK_DATABASE_URL }}
+          # Only the find lane gets it; without it that lane does nothing.
+          ANTHROPIC_API_KEY: ${{ inputs.command == 'find' && secrets.ANTHROPIC_API_KEY || '' }}
           COMMAND: ${{ inputs.command }}
           SCHEDULE: ${{ github.event.schedule }}
         run: |
           if [ -z "$COMMAND" ]; then
-            if [ "$SCHEDULE" = "41 6 * * *" ]; then COMMAND=discover; else COMMAND=crawl; fi
+            case "$SCHEDULE" in
+              "41 6 * * *") COMMAND=discover ;;
+              "53 * * * *") COMMAND=resolve ;;
+              *) COMMAND=crawl ;;
+            esac
           fi
           python -m jobboards "$COMMAND"

@@ -161,6 +161,23 @@ class Bank:
                 "values (%s, %s, %s, %s, now()) on conflict (job_id) do update set posting_id = excluded.posting_id, "
                 "url = excluded.url, score = excluded.score, tried_at = excluded.tried_at", rows)
 
+    # --- the AI posting finder (jobboards/agent.py) ---
+
+    def jobright_homepage_only(self, limit: int) -> List[Dict[str, Any]]:
+        return self.query("select * from bank_jobright_homepage_only(%s)", (limit,))
+
+    def jobright_agent_links(self, limit: int) -> List[Dict[str, Any]]:
+        return self.query("select * from bank_jobright_agent_links(%s)", (limit,))
+
+    def touch_jobright_links(self, job_ids: List[Any]) -> None:
+        if job_ids:
+            self.query("update job_bank_jobright_links set tried_at = now() where job_id = any(%s)", (job_ids,))
+
+    def agent_companies_today(self) -> int:
+        """Companies the finder asked Claude about in the last 24 hours (its daily cap)."""
+        return self.query("select coalesce(sum((stats->>'companies_asked')::int), 0) as n from bank_runs "
+                          "where kind = 'agent' and started_at > now() - interval '1 day'")[0]["n"]
+
     def drop_closed_jobright_links(self) -> int:
         """Links whose posting closed or was pruned: those rows are looked up again."""
         with self.lock:

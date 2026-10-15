@@ -86,3 +86,52 @@ def test_first_read_not_found_is_dead_at_once_but_a_known_board_gets_the_week():
 def test_a_dead_board_that_answers_again_is_active():
     s = schedule(board(status="dead", fail_count=12, failing_since=NOW - timedelta(days=40)), "changed", NOW)
     assert s["status"] == "active" and s["failing_since"] is None
+
+
+# --- parallel crawlers: shards split the due boards by the host they are read from ---
+
+from jobboards import crawl as crawl_module  # noqa: E402
+from jobboards.crawl import in_shard, rate_host  # noqa: E402
+
+ROWS = ([{"id": f"greenhouse:co{i}", "provider": "greenhouse", "key": f"co{i}"} for i in range(40)]
+        + [{"id": f"workday:t{i}", "provider": "workday", "key": f"t{i}.wd5.myworkdayjobs.com/site"} for i in range(40)]
+        + [{"id": f"icims:x{i}", "provider": "icims", "key": f"careers-x{i}.icims.com"} for i in range(20)])
+
+
+def test_every_board_is_in_exactly_one_shard_and_a_hosts_boards_stay_together():
+    shards = [[r["id"] for r in ROWS if in_shard(r, k, 4)] for k in range(4)]
+    assert sorted(sum(shards, [])) == sorted(r["id"] for r in ROWS)
+    assert sum(1 for s in shards if s) > 1
+    # One API host (Greenhouse's) is read by one shard, so its politeness gap holds across shards.
+    assert sum(1 for s in shards if any(i.startswith("greenhouse:") for i in s)) == 1
+    assert all(in_shard(r, 0, 1) for r in ROWS)
+
+
+class FakeBank:
+    def __init__(self):
+        self.touched = 0
+
+    def start_run(self, kind):
+        return 1
+
+    def due_boards(self, limit, early_minutes=0):
+        return ROWS
+
+    def touch_published(self):
+        self.touched += 1
+        return 0
+
+    def finish_run(self, run_id, stats):
+        self.stats = stats
+
+
+def test_a_shard_reads_only_its_boards_and_only_shard_zero_touches_the_site(monkeypatch):
+    read = []
+    monkeypatch.setattr(crawl_module, "crawl_board", lambda bank, row, http, now: read.append(row["id"]) or ("unchanged", 0, 0))
+    for shard in range(4):
+        bank = FakeBank()
+        stats = crawl_module.crawl(bank, None, shard=shard, shards=4)
+        assert stats["due"] == sum(1 for r in ROWS if in_shard(r, shard, 4))
+        assert bank.touched == (1 if shard == 0 else 0)
+    assert sorted(read) == sorted(r["id"] for r in ROWS)
+    assert len({rate_host(r) for r in ROWS if r["provider"] == "greenhouse"}) == 1

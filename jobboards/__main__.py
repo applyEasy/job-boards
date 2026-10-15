@@ -1,4 +1,4 @@
-"""python -m jobboards discover | crawl | resolve | publish | stats   (BANK_DATABASE_URL names the bank)"""
+"""python -m jobboards discover | boards | crawl | resolve | find | publish | stats   (BANK_DATABASE_URL names the bank)"""
 
 from __future__ import annotations
 
@@ -8,33 +8,34 @@ import logging
 import os
 import sys
 
+from jobboards.agent import find
 from jobboards.bank import Bank
 from jobboards.crawl import GAPS, crawl
 from jobboards.discover import from_bank, from_commoncrawl, from_directory, from_feeds, from_homepages, jobright_companies, jobright_coverage
 from jobboards.http import Http
 from jobboards.resolve import resolve
 
-log = logging.getLogger("jobboards")
-
 
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(prog="jobboards")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    discover = sub.add_parser("discover", help="find boards (daily)")
-    discover.add_argument("--no-commoncrawl", action="store_true")
-    discover.add_argument("--cc-crawls", type=int, default=12, help="newest Common Crawl crawls to walk")
-    discover.add_argument("--cc-budget", type=float, default=1200, help="seconds for Common Crawl this run")
-    discover.add_argument("--no-homepages", action="store_true")
-    discover.add_argument("--homepage-budget", type=float, default=900,
-                          help="seconds for reading Jobright-listed companies' homepages this run")
+    sub.add_parser("discover", help="find boards from the quick sources: directory, feeds, the bank's own links (daily)")
+    boards = sub.add_parser("boards", help="find boards from employers' homepages and Common Crawl (its own runs, all day)")
+    boards.add_argument("--homepage-budget", type=float, default=2400,
+                        help="seconds for reading Jobright-listed companies' homepages this run")
+    boards.add_argument("--cc-crawls", type=int, default=12, help="newest Common Crawl crawls to walk")
+    boards.add_argument("--cc-budget", type=float, default=1200, help="seconds for Common Crawl this run")
     run = sub.add_parser("crawl", help="read the boards that are due (hourly)")
     run.add_argument("--budget", type=float, default=2400, help="seconds to keep starting boards")
     run.add_argument("--limit", type=int, default=50000, help="most boards to take this run")
     run.add_argument("--workers", type=int, default=16)
-    run.add_argument("--resolve-budget", type=float, default=600,
-                     help="seconds for reading the homepages of employers with no board, after the crawl")
-    links = sub.add_parser("resolve", help="give homepage-only Jobright rows the employer's posting (after each crawl)")
+    run.add_argument("--shard", type=int, default=0, help="this crawler's share of the boards (0-based)")
+    run.add_argument("--shards", type=int, default=1, help="how many crawlers split the boards")
+    links = sub.add_parser("resolve", help="give homepage-only Jobright rows the employer's posting (its own hourly runs)")
     links.add_argument("--homepage-budget", type=float, default=600)
+    finder = sub.add_parser("find", help="ask Claude for the postings of employers the crawl can't link (needs ANTHROPIC_API_KEY)")
+    finder.add_argument("--max-companies", type=int, default=20, help="most employers asked this run")
+    finder.add_argument("--daily-companies", type=int, default=60, help="most employers asked in 24 hours")
     sub.add_parser("publish", help="put every open intern/new-grad posting in the bank on the site (catch-up)")
     sub.add_parser("stats", help="boards and open postings per platform")
     sub.add_parser("jobright-coverage", help="share of Jobright's roles at employers the bank reads")
@@ -51,23 +52,28 @@ def main(argv=None) -> None:
             run_id = bank.start_run("discover")
             stats = {"directory": bank.add_boards(from_directory()), "feeds": bank.add_boards(from_feeds(http)),
                      "bank": bank.add_boards(from_bank(bank))}
-            if not args.no_homepages:
-                stats["homepages"] = from_homepages(http, bank, jobright_companies(http), budget_s=args.homepage_budget)
-            if not args.no_commoncrawl:
-                stats["commoncrawl"] = from_commoncrawl(http, bank, crawls=args.cc_crawls, budget_s=args.cc_budget)
             stats["pruned_closed_postings"] = bank.prune()
             bank.finish_run(run_id, stats)
+        elif args.cmd == "boards":
+            # Each homepage is read once a month and each Common Crawl index page once, so once
+            # caught up a run is quick; most roles first, so the employers that matter go first.
+            run_id = bank.start_run("boards")
+            stats = {"homepages": from_homepages(http, bank, jobright_companies(http), budget_s=args.homepage_budget),
+                     "commoncrawl": from_commoncrawl(http, bank, crawls=args.cc_crawls, budget_s=args.cc_budget)}
+            bank.finish_run(run_id, stats)
         elif args.cmd == "crawl":
-            stats = crawl(bank, http, budget_s=args.budget, limit=args.limit, workers=args.workers)
-            # The board's read model can't send these rows anywhere better yet; a failure here
-            # (the SQL not applied yet, a slow query) leaves the crawl's own result alone.
-            try:
-                stats["jobright_links"] = resolve(bank, http, homepage_budget_s=args.resolve_budget)
-            except Exception as exc:
-                log.exception("Jobright rows could not be looked up")
-                stats["jobright_links"] = {"error": f"{type(exc).__name__}: {exc}"[:300]}
+            stats = crawl(bank, http, budget_s=args.budget, limit=args.limit, workers=args.workers,
+                          shard=args.shard, shards=args.shards)
         elif args.cmd == "resolve":
             stats = resolve(bank, http, homepage_budget_s=args.homepage_budget)
+        elif args.cmd == "find":
+            if os.environ.get("ANTHROPIC_API_KEY"):
+                import anthropic  # only this lane needs it
+
+                stats = find(bank, http, anthropic.Anthropic(), max_companies=args.max_companies,
+                             daily_companies=args.daily_companies)
+            else:
+                stats = {"skipped": "ANTHROPIC_API_KEY is not set"}
         elif args.cmd == "publish":
             stats = {"job_bank_rows_written": bank.publish_open()}
         elif args.cmd == "jobright-coverage":

@@ -7,6 +7,7 @@ import hashlib
 import logging
 import threading
 import time
+import zlib
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -100,12 +101,20 @@ def rate_host(row: Dict[str, Any]) -> str:
     return API_HOST.get(row["provider"]) or row["key"].split("/")[0].lower()
 
 
-def crawl(bank: Any, http: Any, budget_s: float = 2400, limit: int = 50000, workers: int = 16) -> Dict[str, int]:
-    """Every due board, one worker per API host, until the admission budget runs out."""
+def in_shard(row: Dict[str, Any], shard: int, shards: int) -> bool:
+    """Parallel crawlers split the boards by the host they're read from: one host's boards
+    are always one shard's, so its politeness gap holds, and no board is read twice."""
+    return shards <= 1 or zlib.crc32(rate_host(row).encode()) % shards == shard
+
+
+def crawl(bank: Any, http: Any, budget_s: float = 2400, limit: int = 50000, workers: int = 16,
+          shard: int = 0, shards: int = 1) -> Dict[str, int]:
+    """Every due board of this shard, one worker per API host, until the admission budget runs out."""
     run_id, deadline = bank.start_run("crawl"), time.monotonic() + budget_s
     groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for row in bank.due_boards(limit, DUE_EARLY_MINUTES):
-        groups[rate_host(row)].append(row)
+        if in_shard(row, shard, shards):
+            groups[rate_host(row)].append(row)
     stats: Counter = Counter(due=sum(len(g) for g in groups.values()))
     lock = threading.Lock()
 
@@ -129,7 +138,8 @@ def crawl(bank: Any, http: Any, budget_s: float = 2400, limit: int = 50000, work
     with ThreadPoolExecutor(max_workers=workers) as pool:
         list(pool.map(work, groups.values()))
     try:
-        stats["job_bank_touched"] = bank.touch_published()
+        if shard == 0:  # one shard is enough: it marks every live row the bank holds
+            stats["job_bank_touched"] = bank.touch_published()
     except Exception:  # the site's rows age a day; the next run touches them
         log.exception("job_bank rows could not be marked seen")
         stats["touch_error"] += 1

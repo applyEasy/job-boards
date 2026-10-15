@@ -1,8 +1,10 @@
 # GitHub's cron is best effort: on this repo it went hours without firing once. So
-# each finished crawl or discover run queues the next one itself, 15 minutes later;
-# the crons in crawl.yml stay as a backstop. Nothing is queued while another run
-# waits or works, so chains never multiply -- and a run cut off by its time limit
-# (which GitHub calls cancelled) does not end the chain.
+# each finished run of crawl.yml queues the next run of every lane (crawl, resolve, find, boards)
+# that has none waiting or working, 15 minutes later, and a discover once a day; the
+# crons in crawl.yml stay as a backstop. Each lane has its own queue (crawl.yml), so a
+# resolve never waits behind a crawl. Nothing is queued for a lane that already has a
+# run, so chains never multiply -- and a run cut off by its time limit (which GitHub
+# calls cancelled) does not end the chain.
 # Running often adds no load on employers: a crawl reads only the boards that are due.
 name: heartbeat
 on:
@@ -25,22 +27,21 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
-      - name: Wait 15 minutes, then queue the next run
+      - name: Wait 15 minutes, then queue each idle lane's next run
         run: |
           sleep 900
           runs=$(gh run list --workflow crawl.yml --limit 200 --json displayTitle,status,createdAt)
-          waiting=$(echo "$runs" | jq '[.[] | select(.status != "completed")] | length')
-          discover_waiting=$(echo "$runs" | jq '[.[] | select(.status != "completed") | select(.displayTitle == "discover")] | length')
+          busy() { echo "$runs" | jq --arg lane "$1" '[.[] | select(.status != "completed") | select(.displayTitle == $lane)] | length'; }
           last=$(echo "$runs" | jq -r '[.[] | select(.displayTitle == "discover")][0].createdAt // ""')
           overdue=0
           if [ -z "$last" ] || [ $(( $(date +%s) - $(date -d "$last" +%s) )) -gt 86400 ]; then overdue=1; fi
-          # A day without a discover goes first, even if crawls keep the queue busy (a waiting
-          # crawl it replaces is queued again by the next heartbeat). The coverage report's own
-          # cron is as unreliable, so it rides along.
-          if [ "$overdue" = 1 ] && [ "$discover_waiting" -eq 0 ]; then
+          # The coverage report's own cron is as unreliable, so it rides along with the discover.
+          if [ "$overdue" = 1 ] && [ "$(busy discover)" -eq 0 ]; then
             gh workflow run crawl.yml -f command=discover && gh workflow run jobright-coverage.yml
-            echo "queued discover"; exit 0
+            echo "queued discover"
           fi
-          if [ "$waiting" -gt 0 ]; then echo "a run is already queued or running"; exit 0; fi
-          gh workflow run crawl.yml -f command=crawl
-          echo "queued crawl"
+          for lane in crawl resolve find boards; do
+            if [ "$(busy "$lane")" -gt 0 ]; then echo "$lane: a run is already queued or running"; continue; fi
+            gh workflow run crawl.yml -f command="$lane"
+            echo "queued $lane"
+          done
