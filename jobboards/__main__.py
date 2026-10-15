@@ -1,4 +1,4 @@
-"""python -m jobboards discover | crawl | publish | stats   (BANK_DATABASE_URL names the bank)"""
+"""python -m jobboards discover | crawl | resolve | publish | stats   (BANK_DATABASE_URL names the bank)"""
 
 from __future__ import annotations
 
@@ -12,6 +12,9 @@ from jobboards.bank import Bank
 from jobboards.crawl import GAPS, crawl
 from jobboards.discover import from_bank, from_commoncrawl, from_directory, from_feeds, from_homepages, jobright_companies, jobright_coverage
 from jobboards.http import Http
+from jobboards.resolve import resolve
+
+log = logging.getLogger("jobboards")
 
 
 def main(argv=None) -> None:
@@ -28,6 +31,10 @@ def main(argv=None) -> None:
     run.add_argument("--budget", type=float, default=2400, help="seconds to keep starting boards")
     run.add_argument("--limit", type=int, default=50000, help="most boards to take this run")
     run.add_argument("--workers", type=int, default=16)
+    run.add_argument("--resolve-budget", type=float, default=600,
+                     help="seconds for reading the homepages of employers with no board, after the crawl")
+    links = sub.add_parser("resolve", help="give homepage-only Jobright rows the employer's posting (after each crawl)")
+    links.add_argument("--homepage-budget", type=float, default=600)
     sub.add_parser("publish", help="put every open intern/new-grad posting in the bank on the site (catch-up)")
     sub.add_parser("stats", help="boards and open postings per platform")
     sub.add_parser("jobright-coverage", help="share of Jobright's roles at employers the bank reads")
@@ -52,6 +59,15 @@ def main(argv=None) -> None:
             bank.finish_run(run_id, stats)
         elif args.cmd == "crawl":
             stats = crawl(bank, http, budget_s=args.budget, limit=args.limit, workers=args.workers)
+            # The board's read model can't send these rows anywhere better yet; a failure here
+            # (the SQL not applied yet, a slow query) leaves the crawl's own result alone.
+            try:
+                stats["jobright_links"] = resolve(bank, http, homepage_budget_s=args.resolve_budget)
+            except Exception as exc:
+                log.exception("Jobright rows could not be looked up")
+                stats["jobright_links"] = {"error": f"{type(exc).__name__}: {exc}"[:300]}
+        elif args.cmd == "resolve":
+            stats = resolve(bank, http, homepage_budget_s=args.homepage_budget)
         elif args.cmd == "publish":
             stats = {"job_bank_rows_written": bank.publish_open()}
         elif args.cmd == "jobright-coverage":
