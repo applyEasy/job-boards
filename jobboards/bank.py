@@ -133,6 +133,41 @@ class Bank:
     def touch_published(self) -> int:
         return self.query("select bank_touch_published() as n")[0]["n"]
 
+    # --- Jobright rows that open only the employer's homepage (jobboards/resolve.py) ---
+
+    def jobright_unresolved(self, limit: int) -> List[Dict[str, Any]]:
+        return self.query("select * from bank_jobright_unresolved(%s)", (limit,))
+
+    def board_owners(self) -> List[Dict[str, Any]]:
+        """Each board: the company it was found for, where, whether it was ever read,
+        and the company names its open postings carry (a Common Crawl board has none of its own)."""
+        return self.query(
+            "select b.id, b.company_name, b.evidence_source, b.last_ok_at, "
+            "coalesce(array_agg(distinct p.company_name) filter (where p.company_name is not null), '{}') "
+            "as posting_names from bank_boards b "
+            "left join bank_postings p on p.board_id = b.id and p.closed_at is null group by b.id")
+
+    def open_postings_of(self, board_ids: List[str]) -> List[Dict[str, Any]]:
+        return self.query("select id, board_id, title, locations, url from bank_postings "
+                          "where closed_at is null and board_id = any(%s) order by id", (board_ids,))
+
+    def save_jobright_links(self, rows: List[Tuple[Any, Optional[str], Optional[str], Optional[float]]]) -> None:
+        """(job_id, posting_id, url, score) per Jobright row looked up; no posting: none found yet."""
+        if not rows:
+            return
+        with self.lock, self.conn.cursor() as cur:
+            cur.executemany(
+                "insert into job_bank_jobright_links (job_id, posting_id, url, score, tried_at) "
+                "values (%s, %s, %s, %s, now()) on conflict (job_id) do update set posting_id = excluded.posting_id, "
+                "url = excluded.url, score = excluded.score, tried_at = excluded.tried_at", rows)
+
+    def drop_closed_jobright_links(self) -> int:
+        """Links whose posting closed or was pruned: those rows are looked up again."""
+        with self.lock:
+            return self.conn.execute(
+                "delete from job_bank_jobright_links l where l.posting_id is not null and not exists "
+                "(select 1 from bank_postings b where b.id = l.posting_id and b.closed_at is null)").rowcount
+
     def mark_unchanged(self, board_id: str, sched: Dict[str, Any], now: datetime) -> None:
         with self.lock:
             self._board_update(board_id, sched, ", last_error = null, last_ok_at = %s", (now,))
