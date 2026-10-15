@@ -43,6 +43,22 @@ def test_another_role_does_not(jobright, employer):
     assert best_match(jobright, ["Austin, TX"], [posting(1, employer)]) is None
 
 
+def test_a_title_jobright_took_from_a_job_details_page_finds_its_intern_posting():
+    # Hubbell, 10/15: Jobright's copy lost "2027 Summer Intern:" and gained the page title's tail.
+    hubbell = [posting(1, "2027 Summer Intern: HR - People Analytics", ["Greenville, SC, US, 29615"]),
+               posting(2, "HR - People Analytics Manager", ["Greenville, SC, US, 29615"])]
+    found = best_match("HR - People Analytics Job Details / Hubbell Incorporated", ["Greenville, SC, United States"], hubbell)
+    assert found["id"] == "gh-acme-1"
+    # ...but only in the same city, and only when the title shows it is such a copy.
+    assert best_match("HR - People Analytics Job Details / Hubbell Incorporated", ["Boston, MA"], hubbell[:1]) is None
+    assert best_match("HR - People Analytics", ["Greenville, SC"], hubbell[:1]) is None
+
+
+def test_workdays_n_locations_is_no_city():
+    # Booz Allen, 10/15: "Back End Developer" in McLean, listed by Workday as "2 Locations".
+    assert best_match("Back End Developer", ["McLean, VA, United States"], [posting(1, "Back End Developer", ["2 Locations"])])
+
+
 def test_the_city_picks_between_two_postings_of_one_title():
     found = best_match("Software Engineer Intern", ["Seattle, WA"],
                        [posting(1, "Software Engineer Intern", ["Austin, TX"]),

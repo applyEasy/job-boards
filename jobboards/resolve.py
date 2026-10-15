@@ -20,24 +20,30 @@ from __future__ import annotations
 
 import re
 from collections import Counter, defaultdict
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 from jobboards.discover import _company_key, from_homepages
 
-# Words that never tell two roles apart, and the page text Jobright copies
-# into a few titles ("Intern - Software Engineering Job Details / Ascend").
-_NOISE = frozenset("a an and the of for in at to with job jobs details position role opening opportunity".split())
+# Words that never tell two roles apart.
+_NOISE = frozenset("a an and the of for in at to with position role opening opportunity".split())
 _SAME = {"internship": "intern", "internships": "intern", "interns": "intern", "engineering": "engineer",
          "engineers": "engineer", "sr": "senior", "jr": "junior"}
 # A word only one side has makes it another role: Intern vs. full-time, Co-op
 # vs. Intern, Engineer I vs. II, Senior.
 _KIND = frozenset("intern coop junior senior staff principal lead manager director i ii iii iv 1 2 3 4".split())
-_NOT_A_CITY = frozenset("remote hybrid onsite site in usa united states america office city".split())
+# Workday lists a posting open in several places as "2 Locations": no city.
+_NOT_A_CITY = frozenset("remote hybrid onsite site in usa united states america office city location locations".split())
+# Jobright's copy of a title read off an employer's job page, "<title> Job Details / <Company>",
+# can have lost the term the employer's title led with ("2027 Summer Intern: HR - People
+# Analytics" became "HR - People Analytics Job Details / Hubbell Incorporated", 10/15).
+_PAGE_TAIL = re.compile(r"\s*job details\s*/.*$", re.I)
+_TERM = frozenset("intern coop summer fall winter spring".split())
 
 
 def title_words(title: Optional[str]) -> frozenset:
-    text = re.sub(r"\bco[- ]?op\b", "coop", (title or "").lower().replace("&", " and "))
+    text = _PAGE_TAIL.sub("", title or "").lower().replace("&", " and ")
+    text = re.sub(r"\bco[- ]?op\b", "coop", text)
     return frozenset(w for w in (_SAME.get(w, w) for w in re.findall(r"[a-z0-9+#]+", text)) if w not in _NOISE)
 
 
@@ -55,35 +61,40 @@ def place_words(locations: Optional[Iterable[str]]) -> frozenset:
     return frozenset(words)
 
 
-def _score(jobright: frozenset, employer: frozenset) -> float:
-    """How alike two titles are, 0 when they're two roles. Jobright's title may
-    carry extra words (page text, a place) around the employer's; the employer's
-    may not carry words Jobright's lacks unless nearly all the rest agree."""
+def _score(jobright: frozenset, employer: frozenset, page_copy: bool = False) -> Tuple[float, bool]:
+    """(how alike two titles are, 0 when they're two roles; whether that holds only
+    with a city in common). Jobright's title may carry extra words (page text, a
+    place) around the employer's; the employer's may not carry words Jobright's
+    lacks unless nearly all the rest agree, or Jobright's is a job page's copy that
+    lost only the term."""
     if len(jobright) < 2 or len(employer) < 2:
-        return 0.0  # "Intern" alone says nothing about which role
-    if (jobright & _KIND) != (employer & _KIND):
-        return 0.0
+        return 0.0, False  # "Intern" alone says nothing about which role
     years_a, years_b = _years(jobright), _years(employer)
     if years_a and years_b and not years_a & years_b:
-        return 0.0
+        return 0.0, False
+    if (jobright & _KIND) != (employer & _KIND):
+        lost = employer - jobright
+        if page_copy and jobright <= employer and all(w in _TERM or w in years_b for w in lost):
+            return len(jobright) / len(employer), True
+        return 0.0, False
     same = len(jobright & employer) / len(jobright | employer)
     if same >= 0.8 or (employer <= jobright and same >= 0.5):
-        return same
-    return 0.0
+        return same, False
+    return 0.0, False
 
 
 def best_match(title: str, locations: Optional[Iterable[str]], postings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """The posting that is this role: the closest title, then the most city words in
     common. A posting in another city is another role; no city on a side doesn't block."""
-    words, places = title_words(title), place_words(locations)
+    words, places, page_copy = title_words(title), place_words(locations), bool(_PAGE_TAIL.search(title or ""))
     found = []
     for posting in postings:
-        score = _score(words, title_words(posting["title"]))
+        score, needs_city = _score(words, title_words(posting["title"]), page_copy)
         if not score:
             continue
         theirs = place_words(posting.get("locations"))
         common = len(places & theirs)
-        if places and theirs and not common:
+        if (places and theirs and not common) or (needs_city and not common):
             continue
         found.append((-score, -common, posting["id"], posting))
     if not found:
