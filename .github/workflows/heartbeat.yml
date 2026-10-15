@@ -1,7 +1,8 @@
 # GitHub's cron is best effort: on this repo it went hours without firing once. So
 # each finished crawl or discover run queues the next one itself, 15 minutes later;
-# the cron in crawl.yml stays as a backstop. A cancelled run ends its chain, and
-# nothing is queued while another run waits or works, so chains never multiply.
+# the crons in crawl.yml stay as a backstop. Nothing is queued while another run
+# waits or works, so chains never multiply -- and a run cut off by its time limit
+# (which GitHub calls cancelled) does not end the chain.
 # Running often adds no load on employers: a crawl reads only the boards that are due.
 name: heartbeat
 on:
@@ -17,22 +18,29 @@ concurrency:
   cancel-in-progress: true
 jobs:
   next:
-    if: github.repository == 'applyEasy/job-boards' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion != 'cancelled')
+    if: github.repository == 'applyEasy/job-boards'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
-      - name: Wait 15 minutes, then queue the next run unless one is already waiting
+      - name: Wait 15 minutes, then queue the next run
         run: |
           sleep 900
-          busy=$(gh run list --workflow crawl.yml --limit 20 --json status --jq '[.[] | select(.status != "completed")] | length')
-          if [ "$busy" -gt 0 ]; then echo "a run is already queued or running"; exit 0; fi
-          last=$(gh run list --workflow crawl.yml --limit 200 --json displayTitle,createdAt \
-                   --jq '[.[] | select(.displayTitle == "discover")][0].createdAt // ""')
-          if [ -z "$last" ] || [ $(( $(date +%s) - $(date -d "$last" +%s) )) -gt 86400 ]; then next=discover; else next=crawl; fi
-          gh workflow run crawl.yml -f command=$next
-          # The coverage report's own cron is as unreliable; it rides along with the daily discover.
-          if [ "$next" = discover ]; then gh workflow run jobright-coverage.yml; fi
-          echo "queued $next"
+          runs=$(gh run list --workflow crawl.yml --limit 200 --json displayTitle,status,createdAt)
+          waiting=$(echo "$runs" | jq '[.[] | select(.status != "completed")] | length')
+          discover_waiting=$(echo "$runs" | jq '[.[] | select(.status != "completed") | select(.displayTitle == "discover")] | length')
+          last=$(echo "$runs" | jq -r '[.[] | select(.displayTitle == "discover")][0].createdAt // ""')
+          overdue=0
+          if [ -z "$last" ] || [ $(( $(date +%s) - $(date -d "$last" +%s) )) -gt 86400 ]; then overdue=1; fi
+          # A day without a discover goes first, even if crawls keep the queue busy (a waiting
+          # crawl it replaces is queued again by the next heartbeat). The coverage report's own
+          # cron is as unreliable, so it rides along.
+          if [ "$overdue" = 1 ] && [ "$discover_waiting" -eq 0 ]; then
+            gh workflow run crawl.yml -f command=discover && gh workflow run jobright-coverage.yml
+            echo "queued discover"; exit 0
+          fi
+          if [ "$waiting" -gt 0 ]; then echo "a run is already queued or running"; exit 0; fi
+          gh workflow run crawl.yml -f command=crawl
+          echo "queued crawl"
