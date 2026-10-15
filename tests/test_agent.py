@@ -195,3 +195,15 @@ def test_its_links_are_checked_again_after_three_days_and_dropped_when_the_page_
     stats = run(bank, FakeClient(), http)
     assert stats["links_dropped"] == 1
     assert links(bank)[str(gone)]["url"] is None and links(bank)[str(kept)]["url"] == "https://careers.ibm.com/job/1"
+
+
+def test_a_link_whose_page_cant_be_checked_right_now_is_kept_and_checked_again_later(bank):
+    job = jobright_row(bank, "Software Engineer Intern", company="IBM", website="https://www.ibm.com",
+                       link_kind="posting")
+    bank.query("insert into job_bank_jobright_links (job_id, url, tried_at) values (%s, %s, now() - interval '4 days')",
+               (job, "https://careers.ibm.com/job/1"))
+    down = FakeHttp({"https://careers.ibm.com/job/1": (503, b"", None)})
+    assert run(bank, FakeClient(), down)["links_dropped"] == 0
+    link = links(bank)[str(job)]
+    assert link["url"] == "https://careers.ibm.com/job/1"
+    assert bank.query("select tried_at < now() - interval '3 days' as due from job_bank_jobright_links")[0]["due"]

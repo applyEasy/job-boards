@@ -123,8 +123,13 @@ def ask(client: Any, company: str, homepage: str, roles: List[Dict[str, Any]]) -
     return None
 
 
-def verify(http: Any, url: str, title: str, company: str, robots: Optional[dict] = None) -> Optional[str]:
-    """The page's address if it is this employer's posting of this role, else None."""
+UNSURE = object()  # the page couldn't be checked right now (unreachable, throttled, a server error)
+
+
+def verify(http: Any, url: str, title: str, company: str, robots: Optional[dict] = None,
+           unsure: Any = None) -> Any:
+    """The page's address if it is this employer's posting of this role, else None, or
+    `unsure` when the page couldn't be checked right now."""
     robots = {} if robots is None else robots
     try:
         parts = urlsplit(url or "")
@@ -137,9 +142,11 @@ def verify(http: Any, url: str, title: str, company: str, robots: Optional[dict]
         if not _robots_allows(robots[root], parts.path or "/"):
             return None
         reply = http.get(url)
-    except Exception:  # unreachable, too large, throttled: not checked, so not used
-        return None
+    except Exception:  # unreachable, too large, throttled: not checked
+        return unsure
     final = reply.url or url
+    if reply.status_code == 429 or reply.status_code >= 500:
+        return unsure
     if reply.status_code != 200 or is_job_board(final):
         return None
     text = html_lib.unescape(re.sub(r"<[^>]+>", " ", reply.text[:2_000_000])).lower()
@@ -151,11 +158,13 @@ def verify(http: Any, url: str, title: str, company: str, robots: Optional[dict]
 
 
 def recheck(bank: Any, http: Any, limit: int = 500) -> int:
-    """Its links not checked for 3 days, checked again; a page that no longer shows the role loses its link."""
+    """Its links not checked for 3 days, checked again; a page that answers without the role loses its
+    link, one that can't be checked right now keeps it and is checked again next run."""
     rows, robots = bank.jobright_agent_links(limit), {}
-    dropped = [r for r in rows if not verify(http, r["url"], r["title"], r["company_name"], robots)]
+    checked = [(r, verify(http, r["url"], r["title"], r["company_name"], robots, unsure=UNSURE)) for r in rows]
+    dropped = [r for r, page in checked if page is None]
     bank.save_jobright_links([(r["job_id"], None, None, None) for r in dropped])
-    bank.touch_jobright_links([r["job_id"] for r in rows if r not in dropped])
+    bank.touch_jobright_links([r["job_id"] for r, page in checked if page is not None and page is not UNSURE])
     return len(dropped)
 
 
