@@ -54,9 +54,9 @@ def test_heartbeat_starts_the_daily_coverage_report_with_the_daily_discover():
     assert "gh workflow run crawl.yml -f command=discover && gh workflow run jobright-coverage.yml" in text
 
 
-def test_only_scheduled_and_manual_runs_see_the_claude_key():
+def test_only_the_find_lane_sees_the_claude_key():
     text = (WORKFLOWS / "crawl.yml").read_text()
-    assert "ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}" in text
+    assert "ANTHROPIC_API_KEY: ${{ inputs.command == 'find' && secrets.ANTHROPIC_API_KEY || '' }}" in text
     assert "pull_request" not in text
 
 

@@ -54,8 +54,8 @@ jobs:
       - name: Run
         env:
           BANK_DATABASE_URL: ${{ secrets.BANK_DATABASE_URL }}
-          # Only the find lane uses it; without it that lane does nothing.
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Only the find lane gets it; without it that lane does nothing.
+          ANTHROPIC_API_KEY: ${{ inputs.command == 'find' && secrets.ANTHROPIC_API_KEY || '' }}
           COMMAND: ${{ inputs.command }}
           SCHEDULE: ${{ github.event.schedule }}
         run: |
