@@ -3,10 +3,23 @@ from pathlib import Path
 WORKFLOWS = Path(__file__).parent.parent / ".github" / "workflows"
 
 
+LANE = ("inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') "
+        "|| (github.event.schedule == '53 * * * *' && 'resolve') || 'crawl'")
+
+
 def test_crawl_runs_are_named_by_what_they_do():
-    # The heartbeat tells a discover from a crawl by this name.
+    # The heartbeat tells a discover from a crawl from a resolve by this name.
     text = (WORKFLOWS / "crawl.yml").read_text()
-    assert "run-name: ${{ inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || 'crawl' }}" in text
+    assert f"run-name: ${{{{ {LANE} }}}}" in text
+
+
+def test_each_kind_of_run_has_its_own_queue():
+    # 10/15: a resolve waited two hours behind a crawl. Each lane queues alone; two runs of
+    # one lane still never overlap (only one crawl writes postings at a time).
+    text = (WORKFLOWS / "crawl.yml").read_text()
+    assert f"group: bank-${{{{ {LANE} }}}}" in text
+    assert "cancel-in-progress: false" in text
+    assert '- cron: "53 * * * *"' in text
 
 
 def test_a_crawl_has_room_to_finish_the_boards_it_started():
@@ -24,14 +37,15 @@ def test_heartbeat_follows_every_finished_crawl_run_and_never_doubles_up():
     assert "permissions:\n  actions: write\n  contents: read" in text
     assert "secrets." not in text  # it never touches the bank
     assert 'select(.status != "completed")' in text
-    assert "gh workflow run crawl.yml -f command=crawl" in text
+    assert "for lane in crawl resolve; do" in text
+    assert 'gh workflow run crawl.yml -f command="$lane"' in text
 
 
 def test_an_overdue_discover_is_queued_even_while_crawls_keep_the_queue_busy():
     text = (WORKFLOWS / "heartbeat.yml").read_text()
-    overdue = text.index('if [ "$overdue" = 1 ] && [ "$discover_waiting" -eq 0 ]')
-    busy = text.index('if [ "$waiting" -gt 0 ]')
-    assert overdue < busy
+    overdue = text.index('if [ "$overdue" = 1 ] && [ "$(busy discover)" -eq 0 ]')
+    lanes = text.index("for lane in crawl resolve; do")
+    assert overdue < lanes
     assert 'select(.displayTitle == "discover")' in text
 
 

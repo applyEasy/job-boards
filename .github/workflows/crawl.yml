@@ -1,10 +1,11 @@
 # Scheduled and manual runs only: the bank's secret is never exposed to pull requests.
 name: crawl
-run-name: ${{ inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || 'crawl' }}
+run-name: ${{ inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || (github.event.schedule == '53 * * * *' && 'resolve') || 'crawl' }}
 on:
   schedule:
     - cron: "23 * * * *"   # read the boards that are due
     - cron: "41 6 * * *"   # find new boards
+    - cron: "53 * * * *"   # give homepage-only Jobright rows the employer's posting
   workflow_dispatch:
     inputs:
       command:
@@ -13,8 +14,10 @@ on:
         default: crawl
 permissions:
   contents: read
+# One queue per kind of run, so a resolve never waits behind a two-hour crawl; two runs of
+# one kind never overlap (one crawl at a time writes postings).
 concurrency:
-  group: bank-writer
+  group: bank-${{ inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || (github.event.schedule == '53 * * * *' && 'resolve') || 'crawl' }}
   cancel-in-progress: false
 jobs:
   run:
@@ -35,6 +38,10 @@ jobs:
           SCHEDULE: ${{ github.event.schedule }}
         run: |
           if [ -z "$COMMAND" ]; then
-            if [ "$SCHEDULE" = "41 6 * * *" ]; then COMMAND=discover; else COMMAND=crawl; fi
+            case "$SCHEDULE" in
+              "41 6 * * *") COMMAND=discover ;;
+              "53 * * * *") COMMAND=resolve ;;
+              *) COMMAND=crawl ;;
+            esac
           fi
           python -m jobboards "$COMMAND"
