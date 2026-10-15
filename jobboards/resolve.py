@@ -110,15 +110,9 @@ def _domain(url: Optional[str]) -> str:
         return ""
 
 
-def resolve(bank: Any, http: Any, limit: int = 5000, homepage_budget_s: float = 600) -> Dict[str, int]:
-    """Look up to `limit` homepage-only Jobright rows up; read the homepages of
-    employers with no board for up to `homepage_budget_s` seconds."""
-    stats: Counter = Counter(links_dropped=bank.drop_closed_jobright_links())
-    rows = bank.jobright_unresolved(limit)
-    stats["rows"] = len(rows)
-    if not rows:
-        return dict(stats)
-
+def board_index(bank: Any) -> Dict[str, Any]:
+    """The boards the bank has read, by company key and by the homepage domain they were found
+    from: what tells a Jobright row's employer has a board here."""
     by_name: Dict[str, set] = defaultdict(set)
     by_domain: Dict[str, set] = defaultdict(set)
     read = set()
@@ -131,15 +125,37 @@ def resolve(bank: Any, http: Any, limit: int = 5000, homepage_budget_s: float = 
             by_domain[source.removeprefix("homepage:")].add(board["id"])
         if board["last_ok_at"]:
             read.add(board["id"])
+    return {"by_name": by_name, "by_domain": by_domain, "read": read}
 
+
+def group_rows(rows: List[Dict[str, Any]]) -> Dict[tuple, List[Dict[str, Any]]]:
+    """Rows by employer: (company key, homepage domain)."""
     groups: Dict[tuple, List[Dict[str, Any]]] = defaultdict(list)
     for row in rows:
         groups[(_company_key(row["company_name"]), _domain(row["company_website"]))].append(row)
+    return groups
+
+
+def read_boards(index: Dict[str, Any], name: str, domain: str) -> set:
+    """The employer's boards the crawl has read at least once."""
+    boards = (index["by_name"].get(name, set()) if name else set()) | \
+        (index["by_domain"].get(domain, set()) if domain else set())
+    return boards & index["read"]
+
+
+def resolve(bank: Any, http: Any, limit: int = 5000, homepage_budget_s: float = 600) -> Dict[str, int]:
+    """Look up to `limit` homepage-only Jobright rows up; read the homepages of
+    employers with no board for up to `homepage_budget_s` seconds."""
+    stats: Counter = Counter(links_dropped=bank.drop_closed_jobright_links())
+    rows = bank.jobright_unresolved(limit)
+    stats["rows"] = len(rows)
+    if not rows:
+        return dict(stats)
+    index = board_index(bank)
 
     saves, homepages = [], {}
-    for (name, domain), group in groups.items():
-        boards = (by_name.get(name, set()) if name else set()) | (by_domain.get(domain, set()) if domain else set())
-        boards &= read
+    for (name, domain), group in group_rows(rows).items():
+        boards = read_boards(index, name, domain)
         if not boards:
             # Asked about again in 6 hours, by when its homepage's board may have been read.
             saves += [(row["job_id"], None, None, None) for row in group]

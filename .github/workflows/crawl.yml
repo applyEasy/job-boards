@@ -10,7 +10,7 @@ on:
     inputs:
       command:
         type: choice
-        options: [crawl, discover, resolve, publish, stats, jobright-coverage]
+        options: [crawl, discover, resolve, find, publish, stats, jobright-coverage]
         default: crawl
 permissions:
   contents: read
@@ -34,6 +34,8 @@ jobs:
       - name: Run
         env:
           BANK_DATABASE_URL: ${{ secrets.BANK_DATABASE_URL }}
+          # Only the find lane uses it; without it that lane does nothing.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COMMAND: ${{ inputs.command }}
           SCHEDULE: ${{ github.event.schedule }}
         run: |

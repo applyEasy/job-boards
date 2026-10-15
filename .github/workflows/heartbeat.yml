@@ -1,5 +1,5 @@
 # GitHub's cron is best effort: on this repo it went hours without firing once. So
-# each finished run of crawl.yml queues the next run of every lane (crawl, resolve)
+# each finished run of crawl.yml queues the next run of every lane (crawl, resolve, find)
 # that has none waiting or working, 15 minutes later, and a discover once a day; the
 # crons in crawl.yml stay as a backstop. Each lane has its own queue (crawl.yml), so a
 # resolve never waits behind a crawl. Nothing is queued for a lane that already has a
@@ -40,7 +40,7 @@ jobs:
             gh workflow run crawl.yml -f command=discover && gh workflow run jobright-coverage.yml
             echo "queued discover"
           fi
-          for lane in crawl resolve; do
+          for lane in crawl resolve find; do
             if [ "$(busy "$lane")" -gt 0 ]; then echo "$lane: a run is already queued or running"; continue; fi
             gh workflow run crawl.yml -f command="$lane"
             echo "queued $lane"

@@ -1,4 +1,4 @@
-"""python -m jobboards discover | crawl | resolve | publish | stats   (BANK_DATABASE_URL names the bank)"""
+"""python -m jobboards discover | crawl | resolve | find | publish | stats   (BANK_DATABASE_URL names the bank)"""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 
+from jobboards.agent import find
 from jobboards.bank import Bank
 from jobboards.crawl import GAPS, crawl
 from jobboards.discover import from_bank, from_commoncrawl, from_directory, from_feeds, from_homepages, jobright_companies, jobright_coverage
@@ -31,6 +32,9 @@ def main(argv=None) -> None:
     run.add_argument("--workers", type=int, default=16)
     links = sub.add_parser("resolve", help="give homepage-only Jobright rows the employer's posting (its own hourly runs)")
     links.add_argument("--homepage-budget", type=float, default=600)
+    finder = sub.add_parser("find", help="ask Claude for the postings of employers the crawl can't link (needs ANTHROPIC_API_KEY)")
+    finder.add_argument("--max-companies", type=int, default=20, help="most employers asked this run")
+    finder.add_argument("--daily-companies", type=int, default=60, help="most employers asked in 24 hours")
     sub.add_parser("publish", help="put every open intern/new-grad posting in the bank on the site (catch-up)")
     sub.add_parser("stats", help="boards and open postings per platform")
     sub.add_parser("jobright-coverage", help="share of Jobright's roles at employers the bank reads")
@@ -57,6 +61,14 @@ def main(argv=None) -> None:
             stats = crawl(bank, http, budget_s=args.budget, limit=args.limit, workers=args.workers)
         elif args.cmd == "resolve":
             stats = resolve(bank, http, homepage_budget_s=args.homepage_budget)
+        elif args.cmd == "find":
+            if os.environ.get("ANTHROPIC_API_KEY"):
+                import anthropic  # only this lane needs it
+
+                stats = find(bank, http, anthropic.Anthropic(), max_companies=args.max_companies,
+                             daily_companies=args.daily_companies)
+            else:
+                stats = {"skipped": "ANTHROPIC_API_KEY is not set"}
         elif args.cmd == "publish":
             stats = {"job_bank_rows_written": bank.publish_open()}
         elif args.cmd == "jobright-coverage":

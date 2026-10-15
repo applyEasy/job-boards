@@ -37,14 +37,14 @@ def test_heartbeat_follows_every_finished_crawl_run_and_never_doubles_up():
     assert "permissions:\n  actions: write\n  contents: read" in text
     assert "secrets." not in text  # it never touches the bank
     assert 'select(.status != "completed")' in text
-    assert "for lane in crawl resolve; do" in text
+    assert "for lane in crawl resolve find; do" in text
     assert 'gh workflow run crawl.yml -f command="$lane"' in text
 
 
 def test_an_overdue_discover_is_queued_even_while_crawls_keep_the_queue_busy():
     text = (WORKFLOWS / "heartbeat.yml").read_text()
     overdue = text.index('if [ "$overdue" = 1 ] && [ "$(busy discover)" -eq 0 ]')
-    lanes = text.index("for lane in crawl resolve; do")
+    lanes = text.index("for lane in crawl resolve find; do")
     assert overdue < lanes
     assert 'select(.displayTitle == "discover")' in text
 
@@ -52,3 +52,9 @@ def test_an_overdue_discover_is_queued_even_while_crawls_keep_the_queue_busy():
 def test_heartbeat_starts_the_daily_coverage_report_with_the_daily_discover():
     text = (WORKFLOWS / "heartbeat.yml").read_text()
     assert "gh workflow run crawl.yml -f command=discover && gh workflow run jobright-coverage.yml" in text
+
+
+def test_only_scheduled_and_manual_runs_see_the_claude_key():
+    text = (WORKFLOWS / "crawl.yml").read_text()
+    assert "ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}" in text
+    assert "pull_request" not in text

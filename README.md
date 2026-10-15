@@ -21,6 +21,17 @@ board is read.
   (`jobboards/publish.py` holds a copy of Backend's title rules). Each crawl
   also marks the live rows the bank still holds as seen, once a day each, so
   Backend's 7-day stale sweep leaves them up.
+- **Link** (`resolve`, its own hourly runs): a Jobright row on applyfinch.com
+  that opens only the employer's homepage gets the employer's posting from
+  the bank (same role by title words, kind, year and city), saved in
+  `job_bank_jobright_links` for Backend's read model. An employer with no
+  board yet gets its homepage read for one.
+- **Ask** (`find`, its own runs, needs `ANTHROPIC_API_KEY`): for employers the
+  crawl can't link, Claude searches the web once a month per employer for its
+  careers board and postings. A board it names is added for the crawl; any
+  other link is saved only once its page shows the role and the employer,
+  and checked again every 3 days. Capped per day (`--daily-companies`).
+- Each kind of run has its own queue; the heartbeat keeps every lane going.
 - **Platforms**: Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Oracle
   Recruiting Cloud, iCIMS, Phenom, Jibe, and SuccessFactors. Posting ids are job_bank's own `source_id`s
   (`gh-<slug>-<id>`, `wd-<tenant>-<slug_req>`, ...).
@@ -30,11 +41,13 @@ board is read.
 1. Apply `sql/20261014_boards_bank.sql` to the Supabase database (SQL editor
    or `psql`). It creates the tables (RLS on, closed to anon/authenticated)
    and a `job_boards_crawler` role that can touch only them.
-   Then `sql/20261014_bank_publish.sql` (the functions that write `job_bank`).
+   Then `sql/20261014_bank_publish.sql` (the functions that write `job_bank`),
+   `sql/20261015_jobright_links.sql` (resolve) and `sql/20261016_agent_finder.sql` (find).
 2. Give the role a password: `alter role job_boards_crawler login password '<openssl rand -hex 24>';`
 3. Add the repo secret `BANK_DATABASE_URL`:
    `postgresql://job_boards_crawler.<project-ref>:<password>@<session-pooler-host>:5432/postgres`
-   (Dashboard > Connect > Session pooler shows the host).
+   (Dashboard > Connect > Session pooler shows the host). For `find`, also
+   `ANTHROPIC_API_KEY`; without it that lane does nothing.
 4. Actions > crawl > Run workflow: `discover` once, then `crawl`, then
    `publish` once (puts postings stored before publishing existed on the site).
    After that the schedule runs it.

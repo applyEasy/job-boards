@@ -30,3 +30,13 @@ def test_a_crawl_only_crawls_resolve_has_its_own_runs(monkeypatch):
     assert asked == []
     cli.main(['resolve', '--homepage-budget', '30'])
     assert asked == [{'homepage_budget_s': 30.0}]
+
+
+def test_find_does_nothing_without_a_claude_key(monkeypatch, capsys):
+    bank = Mock()
+    monkeypatch.setenv('BANK_DATABASE_URL', 'unused-test-dsn')
+    monkeypatch.delenv('ANTHROPIC_API_KEY', raising=False)
+    monkeypatch.setattr(cli, 'Bank', lambda dsn: bank)
+    monkeypatch.setattr(cli, 'find', lambda *a, **kw: (_ for _ in ()).throw(AssertionError('asked')))
+    cli.main(['find'])
+    assert 'ANTHROPIC_API_KEY is not set' in capsys.readouterr().out
