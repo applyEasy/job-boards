@@ -37,14 +37,14 @@ def test_heartbeat_follows_every_finished_crawl_run_and_never_doubles_up():
     assert "permissions:\n  actions: write\n  contents: read" in text
     assert "secrets." not in text  # it never touches the bank
     assert 'select(.status != "completed")' in text
-    assert "for lane in crawl resolve find; do" in text
+    assert "for lane in crawl resolve find boards; do" in text
     assert 'gh workflow run crawl.yml -f command="$lane"' in text
 
 
 def test_an_overdue_discover_is_queued_even_while_crawls_keep_the_queue_busy():
     text = (WORKFLOWS / "heartbeat.yml").read_text()
     overdue = text.index('if [ "$overdue" = 1 ] && [ "$(busy discover)" -eq 0 ]')
-    lanes = text.index("for lane in crawl resolve find; do")
+    lanes = text.index("for lane in crawl resolve find boards; do")
     assert overdue < lanes
     assert 'select(.displayTitle == "discover")' in text
 

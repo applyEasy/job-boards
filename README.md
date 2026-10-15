@@ -6,10 +6,11 @@ board is stored. The intern and new-grad ones go onto applyfinch.com (the
 `job_bank` table) in the same write, so a new posting is live as soon as its
 board is read.
 
-- **Find** (`discover`, daily): boards come only from public links on an exact
-  job-platform host (never a guessed slug): the pinned LastRound ATS directory,
-  the public GitHub job lists, Common Crawl's index (resumable page by page),
-  links inside postings already in the bank, and employer homepages from the public job lists.
+- **Find** (`discover` daily, `boards` all day): boards come only from public links on an exact
+  job-platform host (never a guessed slug). `discover`: the pinned LastRound ATS directory,
+  the public GitHub job lists and links inside postings already in the bank. `boards`
+  (its own runs): employer homepages from the public job lists, most roles first, each
+  once a month, and Common Crawl's index (resumable page by page).
 - **Read** (`crawl`, hourly): the boards that are due, split across 4 crawlers
   running side by side (each takes whole hosts, `--shard/--shards`), one worker per API host,
   politely spaced. A board whose listing hasn't changed writes nothing. New,
@@ -74,13 +75,17 @@ Jobright source setting.
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 export BANK_DATABASE_URL=postgresql://...
-.venv/bin/python -m jobboards discover --no-commoncrawl
+.venv/bin/python -m jobboards discover
+.venv/bin/python -m jobboards boards --homepage-budget 60 --cc-budget 0
 .venv/bin/python -m jobboards crawl --limit 50 --budget 120
+.venv/bin/python -m jobboards resolve
+ANTHROPIC_API_KEY=... .venv/bin/python -m jobboards find --max-companies 2
 .venv/bin/python -m jobboards publish
 .venv/bin/python -m jobboards stats
 ```
 
-Options: `discover --cc-crawls 12 --cc-budget 1200`, `crawl --budget 2400 --limit 50000 --workers 16`.
+Options: `boards --homepage-budget 2400 --cc-crawls 12 --cc-budget 1200`, `crawl --budget 2400 --limit 50000 --workers 16 --shard 0 --shards 1`,
+`resolve --homepage-budget 600`, `find --max-companies 20 --daily-companies 60` (`FINDER_MODEL`, default `claude-opus-5-5`).
 Each run writes a `bank_runs` row with its counts.
 
 ## Tests

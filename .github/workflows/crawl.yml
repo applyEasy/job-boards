@@ -4,13 +4,13 @@ run-name: ${{ inputs.command || (github.event.schedule == '41 6 * * *' && 'disco
 on:
   schedule:
     - cron: "23 * * * *"   # read the boards that are due
-    - cron: "41 6 * * *"   # find new boards
+    - cron: "41 6 * * *"   # find new boards from the quick sources (the boards lane does the slow ones)
     - cron: "53 * * * *"   # give homepage-only Jobright rows the employer's posting
   workflow_dispatch:
     inputs:
       command:
         type: choice
-        options: [crawl, discover, resolve, find, publish, stats, jobright-coverage]
+        options: [crawl, discover, boards, resolve, find, publish, stats, jobright-coverage]
         default: crawl
 permissions:
   contents: read
