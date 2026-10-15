@@ -30,6 +30,8 @@ def main(argv=None) -> None:
     run.add_argument("--budget", type=float, default=2400, help="seconds to keep starting boards")
     run.add_argument("--limit", type=int, default=50000, help="most boards to take this run")
     run.add_argument("--workers", type=int, default=16)
+    run.add_argument("--shard", type=int, default=0, help="this crawler's share of the boards (0-based)")
+    run.add_argument("--shards", type=int, default=1, help="how many crawlers split the boards")
     links = sub.add_parser("resolve", help="give homepage-only Jobright rows the employer's posting (its own hourly runs)")
     links.add_argument("--homepage-budget", type=float, default=600)
     finder = sub.add_parser("find", help="ask Claude for the postings of employers the crawl can't link (needs ANTHROPIC_API_KEY)")
@@ -58,7 +60,8 @@ def main(argv=None) -> None:
             stats["pruned_closed_postings"] = bank.prune()
             bank.finish_run(run_id, stats)
         elif args.cmd == "crawl":
-            stats = crawl(bank, http, budget_s=args.budget, limit=args.limit, workers=args.workers)
+            stats = crawl(bank, http, budget_s=args.budget, limit=args.limit, workers=args.workers,
+                          shard=args.shard, shards=args.shards)
         elif args.cmd == "resolve":
             stats = resolve(bank, http, homepage_budget_s=args.homepage_budget)
         elif args.cmd == "find":

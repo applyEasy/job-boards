@@ -58,3 +58,10 @@ def test_only_scheduled_and_manual_runs_see_the_claude_key():
     text = (WORKFLOWS / "crawl.yml").read_text()
     assert "ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}" in text
     assert "pull_request" not in text
+
+
+def test_a_crawl_run_is_four_parallel_shards():
+    text = (WORKFLOWS / "crawl.yml").read_text()
+    assert "shard: [0, 1, 2, 3]" in text and "fail-fast: false" in text
+    assert "python -m jobboards crawl --shard ${{ matrix.shard }} --shards 4" in text
+    assert f"({LANE}) == 'crawl'" in text and f"({LANE}) != 'crawl'" in text

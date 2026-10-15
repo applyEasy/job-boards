@@ -10,7 +10,8 @@ board is read.
   job-platform host (never a guessed slug): the pinned LastRound ATS directory,
   the public GitHub job lists, Common Crawl's index (resumable page by page),
   links inside postings already in the bank, and employer homepages from the public job lists.
-- **Read** (`crawl`, hourly): the boards that are due, one worker per API host,
+- **Read** (`crawl`, hourly): the boards that are due, split across 4 crawlers
+  running side by side (each takes whole hosts, `--shard/--shards`), one worker per API host,
   politely spaced. A board whose listing hasn't changed writes nothing. New,
   edited and relisted postings are written; postings a *complete* listing
   dropped are closed. Busy boards are read every hour, quiet ones back off to

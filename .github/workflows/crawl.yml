@@ -20,8 +20,28 @@ concurrency:
   group: bank-${{ inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || (github.event.schedule == '53 * * * *' && 'resolve') || 'crawl' }}
   cancel-in-progress: false
 jobs:
+  # A crawl is four crawlers side by side, each reading its own hosts' boards (jobboards/crawl.py in_shard).
+  crawl:
+    if: github.repository == 'applyEasy/job-boards' && (inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || (github.event.schedule == '53 * * * *' && 'resolve') || 'crawl') == 'crawl'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install .
+      - name: Crawl shard ${{ matrix.shard }} of 4
+        env:
+          BANK_DATABASE_URL: ${{ secrets.BANK_DATABASE_URL }}
+        run: python -m jobboards crawl --shard ${{ matrix.shard }} --shards 4
   run:
-    if: github.repository == 'applyEasy/job-boards'
+    if: github.repository == 'applyEasy/job-boards' && (inputs.command || (github.event.schedule == '41 6 * * *' && 'discover') || (github.event.schedule == '53 * * * *' && 'resolve') || 'crawl') != 'crawl'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:

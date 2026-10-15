@@ -40,3 +40,12 @@ def test_find_does_nothing_without_a_claude_key(monkeypatch, capsys):
     monkeypatch.setattr(cli, 'find', lambda *a, **kw: (_ for _ in ()).throw(AssertionError('asked')))
     cli.main(['find'])
     assert 'ANTHROPIC_API_KEY is not set' in capsys.readouterr().out
+
+
+def test_crawl_passes_its_shard_on(monkeypatch):
+    monkeypatch.setenv('BANK_DATABASE_URL', 'unused-test-dsn')
+    monkeypatch.setattr(cli, 'Bank', lambda dsn: Mock())
+    asked = []
+    monkeypatch.setattr(cli, 'crawl', lambda *a, **kw: asked.append(kw) or {'changed': 1})
+    cli.main(['crawl', '--shard', '2', '--shards', '4'])
+    assert asked[0]['shard'] == 2 and asked[0]['shards'] == 4
