@@ -65,3 +65,9 @@ def test_a_crawl_run_is_four_parallel_shards():
     assert "shard: [0, 1, 2, 3]" in text and "fail-fast: false" in text
     assert "python -m jobboards crawl --shard ${{ matrix.shard }} --shards 4" in text
     assert f"({LANE}) == 'crawl'" in text and f"({LANE}) != 'crawl'" in text
+
+
+def test_the_finders_model_and_daily_cap_are_repo_variables():
+    text = (WORKFLOWS / "crawl.yml").read_text()
+    assert "FINDER_MODEL: ${{ vars.FINDER_MODEL }}" in text
+    assert "FINDER_DAILY_COMPANIES: ${{ vars.FINDER_DAILY_COMPANIES }}" in text

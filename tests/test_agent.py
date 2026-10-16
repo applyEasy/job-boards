@@ -89,18 +89,32 @@ def answer(*content, stop="tool_use"):
 ROLES = [{"title": "Software Engineer Intern", "locations": ["Austin, TX"]}]
 
 
-def test_one_call_per_company_with_web_search_and_a_strict_report():
+def test_one_call_per_company_on_haiku_with_web_search_and_a_strict_report():
+    # Prince, 10/16: "make the model cheap but enough for our work".
     client = FakeClient(answer(tool_use(careers_url="https://careers.ibm.com", postings=[{"role": 1, "url": ""}])))
     got = agent.ask(client, "IBM", "https://www.ibm.com", ROLES)
     assert got == {"careers_url": "https://careers.ibm.com", "postings": [{"role": 1, "url": ""}]}
     request = client.requests[0]
-    assert request["model"] == "claude-opus-5-5"
-    assert {"type": "web_search_20260209", "name": "web_search", "max_uses": 5} in request["tools"]
+    assert request["model"] == "claude-haiku-5-5"
+    # Haiku has the basic search tool (dynamic filtering is Opus/Sonnet only) and no server-side fallback.
+    assert {"type": "web_search_20250305", "name": "web_search", "max_uses": 5} in request["tools"]
+    assert "fallbacks" not in request and "betas" not in request
+    assert request["output_config"] == {"effort": "medium"}  # low can skip the searches this job is
     report = next(t for t in request["tools"] if t.get("name") == "report")
     assert report["strict"] is True and report["input_schema"]["additionalProperties"] is False
-    assert "tool_choice" not in request  # forced tool use is a 400 on this model
-    assert request["fallbacks"] == "default" and "server-side-fallback-2026-07-01" in request["betas"]
+    assert "tool_choice" not in request
     assert "IBM" in request["messages"][0]["content"] and "Software Engineer Intern" in request["messages"][0]["content"]
+
+
+@pytest.mark.parametrize("model", ["claude-opus-5-5", "claude-sonnet-5-5"])
+def test_a_bigger_model_gets_the_filtering_search_and_refusal_fallbacks(monkeypatch, model):
+    monkeypatch.setattr(agent, "MODEL", model)
+    client = FakeClient(answer(tool_use(careers_url="", postings=[])))
+    agent.ask(client, "IBM", "https://www.ibm.com", ROLES)
+    request = client.requests[0]
+    assert request["model"] == model
+    assert {"type": "web_search_20260209", "name": "web_search", "max_uses": 5} in request["tools"]
+    assert request["fallbacks"] == "default" and request["betas"] == ["server-side-fallback-2026-07-01"]
 
 
 def test_a_paused_search_turn_is_resumed():

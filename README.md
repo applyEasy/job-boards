@@ -32,7 +32,9 @@ board is read.
   crawl can't link, Claude searches the web once a month per employer for its
   careers board and postings. A board it names is added for the crawl; any
   other link is saved only once its page shows the role and the employer,
-  and checked again every 3 days. Capped per day (`--daily-companies`).
+  and checked again every 3 days. Model `claude-haiku-5-5` (about $0.05 an
+  employer, mostly web searches); repo variables `FINDER_MODEL` and
+  `FINDER_DAILY_COMPANIES` (default 60) change the model and the daily cap.
 - Each kind of run has its own queue; the heartbeat keeps every lane going.
 - **Platforms**: Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Oracle
   Recruiting Cloud, iCIMS, Phenom, Jibe, and SuccessFactors. Posting ids are job_bank's own `source_id`s
@@ -85,7 +87,7 @@ ANTHROPIC_API_KEY=... .venv/bin/python -m jobboards find --max-companies 2
 ```
 
 Options: `boards --homepage-budget 2400 --cc-crawls 12 --cc-budget 1200`, `crawl --budget 2400 --limit 50000 --workers 16 --shard 0 --shards 1`,
-`resolve --homepage-budget 600`, `find --max-companies 20 --daily-companies 60` (`FINDER_MODEL`, default `claude-opus-5-5`).
+`resolve --homepage-budget 600`, `find --max-companies 20 --daily-companies 60` (`FINDER_MODEL`, default `claude-haiku-5-5`).
 Each run writes a `bank_runs` row with its counts.
 
 ## Tests

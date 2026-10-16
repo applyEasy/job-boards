@@ -35,7 +35,8 @@ def main(argv=None) -> None:
     links.add_argument("--homepage-budget", type=float, default=600)
     finder = sub.add_parser("find", help="ask Claude for the postings of employers the crawl can't link (needs ANTHROPIC_API_KEY)")
     finder.add_argument("--max-companies", type=int, default=20, help="most employers asked this run")
-    finder.add_argument("--daily-companies", type=int, default=60, help="most employers asked in 24 hours")
+    finder.add_argument("--daily-companies", type=int, default=int(os.environ.get("FINDER_DAILY_COMPANIES") or 60),
+                        help="most employers asked in 24 hours (repo variable FINDER_DAILY_COMPANIES)")
     sub.add_parser("publish", help="put every open intern/new-grad posting in the bank on the site (catch-up)")
     sub.add_parser("stats", help="boards and open postings per platform")
     sub.add_parser("jobright-coverage", help="share of Jobright's roles at employers the bank reads")

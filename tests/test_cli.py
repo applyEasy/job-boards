@@ -80,3 +80,16 @@ def test_the_daily_discover_keeps_to_the_quick_sources(monkeypatch):
     bank.prune.return_value = 4
     cli.main(['discover'])
     assert bank.finish_run.call_args[0][1]['pruned_closed_postings'] == 4
+
+
+def test_find_takes_its_daily_cap_from_the_repo_variable(monkeypatch):
+    monkeypatch.setenv('BANK_DATABASE_URL', 'unused-test-dsn')
+    monkeypatch.setenv('ANTHROPIC_API_KEY', 'test-key')
+    monkeypatch.setenv('FINDER_DAILY_COMPANIES', '2')
+    monkeypatch.setattr(cli, 'Bank', lambda dsn: Mock())
+    asked = []
+    monkeypatch.setattr(cli, 'find', lambda *a, **kw: asked.append(kw) or {})
+    import sys, types
+    monkeypatch.setitem(sys.modules, 'anthropic', types.SimpleNamespace(Anthropic=lambda: object()))
+    cli.main(['find'])
+    assert asked[0]['daily_companies'] == 2 and asked[0]['max_companies'] == 20

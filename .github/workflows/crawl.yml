@@ -56,6 +56,9 @@ jobs:
           BANK_DATABASE_URL: ${{ secrets.BANK_DATABASE_URL }}
           # Only the find lane gets it; without it that lane does nothing.
           ANTHROPIC_API_KEY: ${{ inputs.command == 'find' && secrets.ANTHROPIC_API_KEY || '' }}
+          # The finder's model (default claude-haiku-5-5) and daily cap (default 60), changeable without code.
+          FINDER_MODEL: ${{ vars.FINDER_MODEL }}
+          FINDER_DAILY_COMPANIES: ${{ vars.FINDER_DAILY_COMPANIES }}
           COMMAND: ${{ inputs.command }}
           SCHEDULE: ${{ github.event.schedule }}
         run: |
