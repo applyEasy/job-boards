@@ -221,3 +221,14 @@ def test_a_link_whose_page_cant_be_checked_right_now_is_kept_and_checked_again_l
     link = links(bank)[str(job)]
     assert link["url"] == "https://careers.ibm.com/job/1"
     assert bank.query("select tried_at < now() - interval '3 days' as due from job_bank_jobright_links")[0]["due"]
+
+
+def test_each_run_reports_what_it_spent(bank):
+    jobright_row(bank, "Software Engineer Intern", company="IBM", website="https://www.ibm.com")
+    reply = answer(tool_use(careers_url="", postings=[]))
+    reply.usage = SimpleNamespace(input_tokens=40_000, output_tokens=2_000,
+                                  server_tool_use=SimpleNamespace(web_search_requests=4))
+    stats = run(bank, FakeClient(reply))
+    assert (stats["input_tokens"], stats["output_tokens"], stats["web_searches"]) == (40_000, 2_000, 4)
+    # Haiku: $0.10 / $0.50 per million tokens, $10 per 1,000 searches.
+    assert stats["cost_usd"] == pytest.approx(0.004 + 0.001 + 0.04)
