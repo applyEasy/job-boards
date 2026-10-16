@@ -15,9 +15,11 @@ Nothing Claude returns is used until code has checked it:
   checked again every 3 days and dropped once the page stops showing the role.
 
 Runs as its own lane (`python -m jobboards find`) with a daily cap on employers
-asked. Cost: one request per employer with up to 5 web searches ($10 per 1,000)
-plus the tokens, roughly $0.05-0.30 an employer on claude-opus-5-5 (set
-FINDER_MODEL to change it).
+asked (repo variable FINDER_DAILY_COMPANIES). The model is claude-haiku-5-5 (Prince,
+10/16: "make the model cheap but enough for our work"); set the repo variable
+FINDER_MODEL to change it. Cost on Haiku: one request per employer, up to 5 web
+searches ($10 per 1,000) and its tokens ($0.10/$0.50 per million), about $0.05
+an employer at most, mostly the searches.
 """
 
 from __future__ import annotations
@@ -38,7 +40,11 @@ from jobboards.resolve import _SAME, board_index, group_rows, read_boards, title
 
 log = logging.getLogger("jobboards.agent")
 
-MODEL = os.environ.get("FINDER_MODEL") or "claude-opus-5-5"
+MODEL = os.environ.get("FINDER_MODEL") or "claude-haiku-5-5"
+# Opus, Sonnet and Fable have the search tool that filters results before the model reads
+# them; Haiku has the basic one. The server-side refusal fallback ("default") is for these four.
+_FILTERED_SEARCH = ("claude-opus", "claude-sonnet", "claude-fable")
+_FALLBACKS = ("claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5")
 ROLES_PER_COMPANY = 10
 MAX_SEARCHES = 5
 MAX_TURNS = 3
@@ -100,15 +106,17 @@ def ask(client: Any, company: str, homepage: str, roles: List[Dict[str, Any]]) -
                        for n, r in enumerate(roles, 1))
     first = {"role": "user", "content": PROMPT.format(company=company, homepage=homepage or "unknown", roles=listed)}
     messages: List[Dict[str, Any]] = [first]
+    search = "web_search_20260209" if MODEL.startswith(_FILTERED_SEARCH) else "web_search_20250305"
+    fallback = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"} if MODEL in _FALLBACKS else {}
     for _ in range(MAX_TURNS):
         response = client.beta.messages.create(
             model=MODEL,
             max_tokens=16000,
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
+            # medium, not low: at low the model can skip a search, and searching is the job.
             output_config={"effort": "medium"},
-            tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": MAX_SEARCHES}, REPORT],
+            tools=[{"type": search, "name": "web_search", "max_uses": MAX_SEARCHES}, REPORT],
             messages=messages,
+            **fallback,
         )
         report = next((b for b in response.content if b.type == "tool_use" and b.name == "report"), None)
         if report is not None:
