@@ -166,3 +166,17 @@ def test_an_employer_with_no_board_gets_its_homepage_read(bank, monkeypatch):
     stats = resolve(bank, Mock(), homepage_budget_s=60)
     assert asked == [("Zeta", "https://www.zeta.io", 1)]
     assert stats["boards_found"] == 1 and stats["no_board"] == 1 and stats.get("missed", 0) == 0
+
+
+def test_board_owners_reads_one_posting_name_per_board_not_every_posting(bank):
+    # 10/16 05:12 and 05:31: resolve died on the crawler role's 120 s statement timeout while
+    # board_owners aggregated every open posting's company name (over a million rows).
+    bank.query("insert into bank_boards (id, provider, key, company_name, evidence_url, evidence_source, status) "
+               "values ('greenhouse:x', 'greenhouse', 'x', '', 'https://x', 'commoncrawl:c', 'active')")
+    for n in range(3):
+        bank.query("insert into bank_postings (id, source, board_id, company_name, title, url, content_hash) "
+                   "values (%s, 'ats_greenhouse', 'greenhouse:x', 'Xylo Labs', 'Intern', %s, 'h')", (f"gh-x-{n}", f"https://x/{n}"))
+    owners = {b["id"]: b for b in bank.board_owners()}
+    assert owners["greenhouse:x"]["posting_name"] == "Xylo Labs"
+    plan = "\n".join(r["QUERY PLAN"] for r in bank.query("explain " + bank.BOARD_OWNERS))
+    assert "HashAggregate" not in plan and "GroupAggregate" not in plan
