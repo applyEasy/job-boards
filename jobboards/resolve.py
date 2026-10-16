@@ -117,7 +117,7 @@ def board_index(bank: Any) -> Dict[str, Any]:
     by_domain: Dict[str, set] = defaultdict(set)
     read = set()
     for board in bank.board_owners():
-        for name in (board["company_name"], *board["posting_names"]):
+        for name in (board["company_name"], board["posting_name"]):
             if _company_key(name):
                 by_name[_company_key(name)].add(board["id"])
         source = board["evidence_source"] or ""

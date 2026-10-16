@@ -138,14 +138,16 @@ class Bank:
     def jobright_unresolved(self, limit: int) -> List[Dict[str, Any]]:
         return self.query("select * from bank_jobright_unresolved(%s)", (limit,))
 
+    # One open posting's company name per board, through the open-postings-by-board index: aggregating
+    # every open posting's name (over a million rows) hit the role's 120 s statement timeout (10/16).
+    BOARD_OWNERS = ("select b.id, b.company_name, b.evidence_source, b.last_ok_at, "
+                    "(select p.company_name from bank_postings p where p.board_id = b.id and p.closed_at is null "
+                    "limit 1) as posting_name from bank_boards b")
+
     def board_owners(self) -> List[Dict[str, Any]]:
-        """Each board: the company it was found for, where, whether it was ever read,
-        and the company names its open postings carry (a Common Crawl board has none of its own)."""
-        return self.query(
-            "select b.id, b.company_name, b.evidence_source, b.last_ok_at, "
-            "coalesce(array_agg(distinct p.company_name) filter (where p.company_name is not null), '{}') "
-            "as posting_names from bank_boards b "
-            "left join bank_postings p on p.board_id = b.id and p.closed_at is null group by b.id")
+        """Each board: the company it was found for, where, whether it was ever read, and the
+        company name its open postings carry (a Common Crawl board has none of its own)."""
+        return self.query(self.BOARD_OWNERS)
 
     def open_postings_of(self, board_ids: List[str]) -> List[Dict[str, Any]]:
         return self.query("select id, board_id, title, locations, url from bank_postings "
