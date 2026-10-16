@@ -45,6 +45,9 @@ MODEL = os.environ.get("FINDER_MODEL") or "claude-haiku-5-5"
 # them; Haiku has the basic one. The server-side refusal fallback ("default") is for these four.
 _FILTERED_SEARCH = ("claude-opus", "claude-sonnet", "claude-fable")
 _FALLBACKS = ("claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5")
+# $ per million input / output tokens (Anthropic's list prices, 10/2026), for the run's cost line.
+_PRICES = {"claude-haiku-5-5": (0.10, 0.50), "claude-sonnet-5-5": (2.0, 10.0), "claude-opus-5-5": (4.0, 20.0)}
+SEARCH_USD = 0.01  # $10 per 1,000 web searches
 ROLES_PER_COMPANY = 10
 MAX_SEARCHES = 5
 MAX_TURNS = 3
@@ -100,8 +103,19 @@ def is_job_board(url: Optional[str]) -> bool:
     return any(label in _JOB_BOARDS for label in labels[-3:-1])
 
 
-def ask(client: Any, company: str, homepage: str, roles: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """Claude's report for one employer: {careers_url, postings: [{role, url}]}, or None (a refusal, or no report)."""
+def _add_usage(spent: Optional[Counter], response: Any) -> None:
+    usage = getattr(response, "usage", None)
+    if spent is None or usage is None:
+        return
+    spent["input_tokens"] += getattr(usage, "input_tokens", 0) or 0
+    spent["output_tokens"] += getattr(usage, "output_tokens", 0) or 0
+    spent["web_searches"] += getattr(getattr(usage, "server_tool_use", None), "web_search_requests", 0) or 0
+
+
+def ask(client: Any, company: str, homepage: str, roles: List[Dict[str, Any]],
+        spent: Optional[Counter] = None) -> Optional[Dict[str, Any]]:
+    """Claude's report for one employer: {careers_url, postings: [{role, url}]}, or None (a refusal, or no
+    report). Tokens and searches each request used are added to `spent`."""
     listed = "\n".join(f"{n}. {r['title']} ({', '.join((r.get('locations') or [])[:3]) or 'place not given'})"
                        for n, r in enumerate(roles, 1))
     first = {"role": "user", "content": PROMPT.format(company=company, homepage=homepage or "unknown", roles=listed)}
@@ -118,6 +132,7 @@ def ask(client: Any, company: str, homepage: str, roles: List[Dict[str, Any]]) -
             messages=messages,
             **fallback,
         )
+        _add_usage(spent, response)
         report = next((b for b in response.content if b.type == "tool_use" and b.name == "report"), None)
         if report is not None:
             return dict(report.input)
@@ -187,7 +202,7 @@ def find(bank: Any, http: Any, client: Any, max_companies: int = 20, daily_compa
         left = min(max_companies, daily_companies - bank.agent_companies_today())
         if left <= 0:
             stats["daily_cap_reached"] = 1
-            return dict(stats)
+            return stats
         index, done = board_index(bank), bank.done_items("agent")
         employers = sorted(((key, group) for key, group in group_rows(bank.jobright_homepage_only(limit)).items()
                             if not read_boards(index, *key) and f"{key[1] or key[0]}|{month}" not in done),
@@ -197,7 +212,7 @@ def find(bank: Any, http: Any, client: Any, max_companies: int = 20, daily_compa
             company, homepage = group[0]["company_name"], group[0]["company_website"]
             roles = group[:ROLES_PER_COMPANY]
             try:
-                report = ask(client, company, homepage, roles)
+                report = ask(client, company, homepage, roles, stats)
             except Exception as exc:  # one employer's failed request never stops the others
                 log.warning("finder: %s could not be asked: %s", company, exc)
                 stats["errors"] += 1
@@ -227,6 +242,9 @@ def find(bank: Any, http: Any, client: Any, max_companies: int = 20, daily_compa
                 else:
                     stats["rejected"] += 1
             bank.save_jobright_links(saves)
-        return dict(stats)
+        return stats  # the same object the finally below adds the cost to
     finally:
+        in_price, out_price = _PRICES.get(MODEL, (0.0, 0.0))
+        stats["cost_usd"] = round(stats["input_tokens"] * in_price / 1e6 + stats["output_tokens"] * out_price / 1e6
+                                  + stats["web_searches"] * SEARCH_USD, 4)
         bank.finish_run(run_id, dict(stats))
