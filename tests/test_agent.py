@@ -232,3 +232,16 @@ def test_each_run_reports_what_it_spent(bank):
     assert (stats["input_tokens"], stats["output_tokens"], stats["web_searches"]) == (40_000, 2_000, 4)
     # Haiku: $0.10 / $0.50 per million tokens, $10 per 1,000 searches.
     assert stats["cost_usd"] == pytest.approx(0.004 + 0.001 + 0.04)
+
+
+def test_the_money_goes_to_employers_with_intern_and_new_grad_roles_not_store_jobs(bank):
+    # 10/16: the first live run spent on Tesco (248 store rows) and Banfield Pet Hospital.
+    for n in range(30):
+        jobright_row(bank, f"Customer Assistant {n}", company="Tesco", website="https://www.tesco.com")
+    jobright_row(bank, "Software Engineer Intern", company="IBM", website="https://www.ibm.com")
+    jobright_row(bank, "Data Analyst Intern", company="IBM", website="https://www.ibm.com")
+    client = FakeClient(answer(tool_use(careers_url="", postings=[])), answer(tool_use(careers_url="", postings=[])))
+    stats = run(bank, client, max_companies=5)
+    assert stats["companies_asked"] == 1
+    assert "IBM" in client.requests[0]["messages"][0]["content"]
+    assert "Customer Assistant" not in client.requests[0]["messages"][0]["content"]

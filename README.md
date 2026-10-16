@@ -29,7 +29,8 @@ board is read.
   `job_bank_jobright_links` for Backend's read model. An employer with no
   board yet gets its homepage read for one.
 - **Ask** (`find`, its own runs, needs `ANTHROPIC_API_KEY`): for employers the
-  crawl can't link, Claude searches the web once a month per employer for its
+  crawl can't link (most intern/new-grad roles first; employers with none are
+  skipped), Claude searches the web once a month per employer for its
   careers board and postings. A board it names is added for the crawl; any
   other link is saved only once its page shows the role and the employer,
   and checked again every 3 days. Model `claude-haiku-5-5` (about $0.05 an

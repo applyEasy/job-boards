@@ -35,6 +35,7 @@ from urllib.parse import urlsplit
 
 from jobboards.boards import Board, board_from_url
 from jobboards.discover import _company_boards, _company_key
+from jobboards.publish import is_early_career
 from jobboards.readers import _robots_allows, _robots_rules
 from jobboards.resolve import _SAME, board_index, group_rows, read_boards, title_words
 
@@ -204,13 +205,18 @@ def find(bank: Any, http: Any, client: Any, max_companies: int = 20, daily_compa
             stats["daily_cap_reached"] = 1
             return stats
         index, done = board_index(bank), bank.done_items("agent")
-        employers = sorted(((key, group) for key, group in group_rows(bank.jobright_homepage_only(limit)).items()
-                            if not read_boards(index, *key) and f"{key[1] or key[0]}|{month}" not in done),
-                           key=lambda item: -len(item[1]))
+        # Ranked by intern and new-grad roles, the ones students come for: by raw row count the
+        # first live run (10/16) spent on Tesco's 248 store jobs. An employer with none isn't asked.
+        employers = []
+        for key, group in group_rows(bank.jobright_homepage_only(limit)).items():
+            early = [row for row in group if is_early_career(row["title"])]
+            if early and not read_boards(index, *key) and f"{key[1] or key[0]}|{month}" not in done:
+                employers.append((key, early))
+        employers.sort(key=lambda item: -len(item[1]))
         robots: dict = {}
-        for (name, domain), group in employers[:left]:
-            company, homepage = group[0]["company_name"], group[0]["company_website"]
-            roles = group[:ROLES_PER_COMPANY]
+        for (name, domain), early in employers[:left]:
+            company, homepage = early[0]["company_name"], early[0]["company_website"]
+            roles = early[:ROLES_PER_COMPANY]
             try:
                 report = ask(client, company, homepage, roles, stats)
             except Exception as exc:  # one employer's failed request never stops the others
