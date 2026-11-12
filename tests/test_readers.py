@@ -204,6 +204,33 @@ def test_icims_robots_wildcards_block_only_what_they_match():
     assert not _robots_allows(rules, "/x.pdf") and _robots_allows(rules, "/x.pdf?y")
 
 
+@pytest.mark.parametrize("body", [
+    "<html>maintenance</html>",
+    '<?xml version="1.0"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    f"<sitemap><loc>{ICIMS}/sitemap1.xml</loc></sitemap></sitemapindex>"])
+def test_icims_answer_that_is_not_a_sitemap_is_a_failed_read_not_an_empty_board(body):
+    with pytest.raises(ReadFailed):
+        read("icims", "careers-gdms.icims.com", {**_icims_routes(), f"{ICIMS}/sitemap.xml": body})
+
+
+def test_icims_sitemap_with_no_jobs_is_a_complete_empty_listing():
+    body = f'<?xml version="1.0"?><URLSET><url><loc>{ICIMS}/jobs/intro</loc></url></URLSET>'
+    listing, _ = read("icims", "careers-gdms.icims.com", {**_icims_routes(), f"{ICIMS}/sitemap.xml": body})
+    assert listing.complete and listing.postings == [] and listing.keep == set()
+
+
+def test_oracle_and_workday_zero_counts_are_complete_empty_listings():
+    # A real empty site and a blip answer the same, so these readers can't tell them apart:
+    # crawl_board does (it closes only on the second empty read in a row).
+    oracle, _ = read("oracle", "edbz.fa.us2.oraclecloud.com/CX", {
+        "https://edbz.fa.us2.oraclecloud.com/hcmRestApi/": json.dumps(
+            {"items": [{"TotalJobsCount": 0, "requisitionList": []}]})})
+    workday, _ = read("workday", "nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", {
+        "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs":
+            json.dumps({"total": 0, "jobPostings": []})})
+    assert oracle.complete and oracle.postings == [] and workday.complete and workday.postings == []
+
+
 def test_icims_page_cap_leaves_the_read_incomplete(monkeypatch):
     monkeypatch.setattr("jobboards.readers.ICIMS_PAGES_PER_READ", 1)
     listing, _ = read("icims", "careers-gdms.icims.com", _icims_routes())

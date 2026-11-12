@@ -118,6 +118,22 @@ def test_failures_keep_postings_until_the_board_is_dead(bank):
     assert the_board(bank)["status"] == "dead" and rows(bank)["gh-acme-1"]["closed_at"] == late
 
 
+def test_one_empty_answer_keeps_every_posting_up_and_a_second_in_a_row_takes_them_down(bank):
+    crawl_board(bank, the_board(bank), None, T0, read=reader_of(Listing([post(1, "Intern"), post(2)], True)))
+    t1 = T0 + timedelta(hours=1)
+    crawl_board(bank, the_board(bank), None, t1, read=reader_of(Listing([], True)))
+    b = the_board(bank)
+    assert all(r["closed_at"] is None for r in rows(bank).values()) and site(bank)["gh-acme-1"]["is_active"]
+    assert b["status"] == "active" and b["open_postings"] == 2 and b["fail_count"] == 1
+    assert b["next_check_at"] == t1 + timedelta(hours=1) and b["last_error"].startswith("EmptyListing: ")
+    t2 = t1 + timedelta(hours=1)
+    crawl_board(bank, the_board(bank), None, t2, read=reader_of(Listing([], True)))
+    b = the_board(bank)
+    assert all(r["closed_at"] == t2 for r in rows(bank).values()) and not site(bank)["gh-acme-1"]["is_active"]
+    assert b["status"] == "empty" and b["open_postings"] == 0 and b["fail_count"] == 0 and b["last_error"] is None
+    assert b["next_check_at"] == t2 + timedelta(days=7)
+
+
 def test_never_read_board_that_is_not_found_is_dead_at_once(bank):
     crawl_board(bank, the_board(bank), None, T0, read=reader_of(NotABoard("HTTP 404")))
     assert the_board(bank)["status"] == "dead"

@@ -17,7 +17,9 @@ board is read.
   edited and relisted postings are written; postings a *complete* listing
   dropped are closed. Busy boards are read every hour, quiet ones back off to
   48 h, empty ones weekly; a board failing for 7 days is dead (its postings
-  close) and is retried monthly.
+  close) and is retried monthly. One empty answer from a board that has open
+  postings closes nothing: it counts as a failed read, and only a second
+  empty answer in a row closes them.
 - **Publish** (inside every crawl write): new and edited intern/new-grad
   postings are upserted into `job_bank`, closed ones taken down
   (`jobboards/publish.py` holds a copy of Backend's title rules). Each crawl

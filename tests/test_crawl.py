@@ -88,6 +88,89 @@ def test_a_dead_board_that_answers_again_is_active():
     assert s["status"] == "active" and s["failing_since"] is None
 
 
+# --- one read of one board, against a bank kept in memory ---
+
+from jobboards.crawl import crawl_board  # noqa: E402
+from jobboards.readers import ReadFailed  # noqa: E402
+
+EMPTY = Listing([], complete=True)
+
+
+class MemoryBank:
+    """The board row and the postings crawl_board reads and writes, as jobboards/bank.py keeps them."""
+
+    def __init__(self):
+        self.row = board(id="greenhouse:acme", provider="greenhouse", key="acme", status="new", last_ok_at=None,
+                         list_hash=None, last_error=None)
+        self.postings = {}
+
+    def stored(self, board_id):
+        return dict(self.postings)
+
+    def apply(self, board_id, upserts, closed, sched, list_hash, now):
+        self.postings.update({p.id: (p.content_hash(), True) for p in upserts})
+        self.postings.update({i: (self.postings[i][0], False) for i in closed})
+        self.row.update(sched, list_hash=list_hash, last_error=None, last_ok_at=now)
+
+    def mark_unchanged(self, board_id, sched, now):
+        self.row.update(sched, last_error=None, last_ok_at=now)
+
+    def fail(self, board_id, error, sched, now):
+        if sched["status"] == "dead":
+            self.postings = {i: (h, False) for i, (h, _) in self.postings.items()}
+        self.row.update(sched, last_error=error)
+
+    def open(self):
+        return sorted(i for i, (_, is_open) in self.postings.items() if is_open)
+
+    def read(self, answer, hours):
+        """One read of the board `hours` after NOW; an exception is a read that failed."""
+        def reader(board, http, known):
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+        return crawl_board(self, dict(self.row), None, NOW + timedelta(hours=hours), read=reader)
+
+
+def test_one_empty_answer_closes_nothing_and_the_board_is_read_again_in_an_hour():
+    bank = MemoryBank()
+    bank.read(Listing([post(1), post(2)], complete=True), hours=0)
+    assert bank.read(EMPTY, hours=1) == ("empty_unconfirmed", 0, 0)
+    assert bank.open() == ["gh-acme-1", "gh-acme-2"]
+    assert bank.row["status"] == "active" and bank.row["fail_count"] == 1
+    assert bank.row["next_check_at"] == NOW + timedelta(hours=2)
+    assert bank.row["last_error"].startswith("EmptyListing: ")
+
+
+def test_a_second_empty_answer_in_a_row_closes_the_postings_and_the_board_goes_weekly():
+    bank = MemoryBank()
+    bank.read(Listing([post(1), post(2)], complete=True), hours=0)
+    bank.read(EMPTY, hours=1)
+    assert bank.read(EMPTY, hours=2) == ("empty", 0, 2)
+    assert bank.open() == []
+    assert bank.row["status"] == "empty" and bank.row["fail_count"] == 0 and bank.row["last_error"] is None
+    assert bank.row["next_check_at"] == NOW + timedelta(hours=2, days=7)
+
+
+def test_a_failed_read_or_a_listing_between_two_empty_answers_starts_the_count_again():
+    for between in (ReadFailed("HTTP 500"), Listing([post(1), post(2)], complete=True)):
+        bank = MemoryBank()
+        bank.read(Listing([post(1), post(2)], complete=True), hours=0)
+        bank.read(EMPTY, hours=1)
+        bank.read(between, hours=2)
+        assert bank.read(EMPTY, hours=3) == ("empty_unconfirmed", 0, 0)
+        assert bank.open() == ["gh-acme-1", "gh-acme-2"]
+
+
+def test_a_board_that_was_already_empty_stays_on_its_weekly_schedule():
+    bank = MemoryBank()
+    assert bank.read(EMPTY, hours=0) == ("empty", 0, 0)  # a first read that finds nothing has nothing to protect
+    assert bank.row["status"] == "empty" and bank.row["next_check_at"] == NOW + timedelta(days=7)
+    assert bank.read(EMPTY, hours=7 * 24) == ("empty", 0, 0)
+    assert bank.row["status"] == "empty" and bank.row["fail_count"] == 0
+    assert bank.row["next_check_at"] == NOW + timedelta(days=14)
+
+
 # --- parallel crawlers: shards split the due boards by the host they are read from ---
 
 from jobboards import crawl as crawl_module  # noqa: E402

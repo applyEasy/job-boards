@@ -386,6 +386,8 @@ def read_icims(board: Board, http: Any, known: Dict[str, Optional[str]]) -> List
     sitemap = http.get(f"https://{host}/sitemap.xml")
     if sitemap.status_code != 200:
         raise ReadFailed(f"sitemap answered {sitemap.status_code}")
+    if "<urlset" not in sitemap.text.lower():  # a maintenance page or a sitemap index lists no jobs either
+        raise ReadFailed("not an iCIMS sitemap")
     out, keep, seen = [], set(), set()
     opened, complete = 0, True
     for job_id, _, lastmod in _ICIMS_JOB.findall(sitemap.text):
