@@ -62,13 +62,20 @@ def schedule(row: Dict[str, Any], outcome: str, now: datetime) -> Dict[str, Any]
                 "next_check_at": now + timedelta(days=EMPTY_DAYS), **ok}
     fails = int(row.get("fail_count") or 0) + 1
     since = row.get("failing_since") or now
+    # An empty answer nobody believed yet never makes a board dead: dead closes every posting,
+    # which is what the second empty read is there to confirm first.
     dead = (outcome == "not_a_board" and row.get("last_ok_at") is None) \
-        or since <= now - timedelta(days=DEAD_AFTER_DAYS)
+        or (outcome != "empty_unconfirmed" and since <= now - timedelta(days=DEAD_AFTER_DAYS))
     if dead:
         return {"status": "dead", "interval_hours": interval, "fail_count": fails, "failing_since": since,
                 "next_check_at": now + timedelta(days=DEAD_RECHECK_DAYS)}
+    wait = timedelta(hours=min(24, 2 ** (fails - 1)))
+    if outcome == "empty_unconfirmed":
+        # A run reads boards DUE_EARLY_MINUTES before they fall due, so without the margin the
+        # second read could come a quarter hour later and a short blip would still close the board.
+        wait = timedelta(hours=CHANGED_HOURS, minutes=DUE_EARLY_MINUTES)
     return {"status": row.get("status") or "new", "interval_hours": interval, "fail_count": fails,
-            "failing_since": since, "next_check_at": now + timedelta(hours=min(24, 2 ** (fails - 1)))}
+            "failing_since": since, "next_check_at": now + wait}
 
 
 def crawl_board(bank: Any, row: Dict[str, Any], http: Any, now: datetime,

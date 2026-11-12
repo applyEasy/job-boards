@@ -16,7 +16,7 @@ pytestmark = pytest.mark.skipif(not DSN, reason="BANK_TEST_DATABASE_URL not set"
 
 from jobboards.bank import Bank  # noqa: E402
 from jobboards.boards import Board  # noqa: E402
-from jobboards.crawl import crawl_board  # noqa: E402
+from jobboards.crawl import DUE_EARLY_MINUTES, crawl_board  # noqa: E402
 from jobboards.readers import Listing, NotABoard, Posting, ReadFailed  # noqa: E402
 
 SQL = Path(__file__).parent.parent / "sql"
@@ -125,7 +125,8 @@ def test_one_empty_answer_keeps_every_posting_up_and_a_second_in_a_row_takes_the
     b = the_board(bank)
     assert all(r["closed_at"] is None for r in rows(bank).values()) and site(bank)["gh-acme-1"]["is_active"]
     assert b["status"] == "active" and b["open_postings"] == 2 and b["fail_count"] == 1
-    assert b["next_check_at"] == t1 + timedelta(hours=1) and b["last_error"].startswith("EmptyListing: ")
+    assert b["next_check_at"] == t1 + timedelta(hours=1, minutes=DUE_EARLY_MINUTES)
+    assert b["last_error"].startswith("EmptyListing: ")
     t2 = t1 + timedelta(hours=1)
     crawl_board(bank, the_board(bank), None, t2, read=reader_of(Listing([], True)))
     b = the_board(bank)

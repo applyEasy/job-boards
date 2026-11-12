@@ -90,7 +90,7 @@ def test_a_dead_board_that_answers_again_is_active():
 
 # --- one read of one board, against a bank kept in memory ---
 
-from jobboards.crawl import crawl_board  # noqa: E402
+from jobboards.crawl import DEAD_AFTER_DAYS, DUE_EARLY_MINUTES, crawl_board  # noqa: E402
 from jobboards.readers import ReadFailed  # noqa: E402
 
 EMPTY = Listing([], complete=True)
@@ -139,7 +139,7 @@ def test_one_empty_answer_closes_nothing_and_the_board_is_read_again_in_an_hour(
     assert bank.read(EMPTY, hours=1) == ("empty_unconfirmed", 0, 0)
     assert bank.open() == ["gh-acme-1", "gh-acme-2"]
     assert bank.row["status"] == "active" and bank.row["fail_count"] == 1
-    assert bank.row["next_check_at"] == NOW + timedelta(hours=2)
+    assert bank.row["next_check_at"] == NOW + timedelta(hours=2, minutes=DUE_EARLY_MINUTES)
     assert bank.row["last_error"].startswith("EmptyListing: ")
 
 
@@ -161,6 +161,27 @@ def test_a_failed_read_or_a_listing_between_two_empty_answers_starts_the_count_a
         bank.read(between, hours=2)
         assert bank.read(EMPTY, hours=3) == ("empty_unconfirmed", 0, 0)
         assert bank.open() == ["gh-acme-1", "gh-acme-2"]
+
+
+def test_a_board_failing_for_a_week_is_not_declared_dead_by_one_empty_answer():
+    """The 7-day dead rule must not turn one empty answer into closing every posting."""
+    bank = MemoryBank()
+    bank.read(Listing([post(1), post(2)], complete=True), hours=0)
+    bank.read(ReadFailed("HTTP 500"), hours=1)
+    week_later = 1 + DEAD_AFTER_DAYS * 24 + 1
+    assert bank.read(EMPTY, hours=week_later) == ("empty_unconfirmed", 0, 0)
+    assert bank.row["status"] != "dead"
+    assert bank.open() == ["gh-acme-1", "gh-acme-2"]
+    assert bank.read(EMPTY, hours=week_later + 2) == ("empty", 0, 2)  # a second empty answer in a row closes
+
+
+def test_the_second_read_after_an_empty_answer_is_not_due_for_a_full_hour():
+    """A run reads boards DUE_EARLY_MINUTES before they fall due, so the recheck carries that margin."""
+    bank = MemoryBank()
+    bank.read(Listing([post(1), post(2)], complete=True), hours=0)
+    bank.read(EMPTY, hours=1)
+    due_from = bank.row["next_check_at"] - timedelta(minutes=DUE_EARLY_MINUTES)
+    assert due_from >= NOW + timedelta(hours=2)
 
 
 def test_a_board_that_was_already_empty_stays_on_its_weekly_schedule():
