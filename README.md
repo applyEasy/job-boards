@@ -24,7 +24,11 @@ board is read.
   postings are upserted into `job_bank`, closed ones taken down
   (`jobboards/publish.py` holds a copy of Backend's title rules). Each crawl
   also marks the live rows the bank still holds as seen, once a day each, so
-  Backend's 7-day stale sweep leaves them up.
+  Backend's 7-day stale sweep leaves them up. A board too big to list in full
+  never closes a posting, so once `sql/20261112_last_listed_at.sql` is applied
+  its reads stamp what they did list (`bank_postings.last_listed_at`); with
+  `sql/20261112_touch_listed_postings.sql` applied too, such a board's rows
+  are marked seen only if listed in the last 7 days.
 - **Link** (`resolve`, its own hourly runs): a Jobright row on applyfinch.com
   that opens only the employer's homepage gets the employer's posting from
   the bank (same role by title words, kind, year and city), saved in
@@ -50,6 +54,8 @@ board is read.
    and a `job_boards_crawler` role that can touch only them.
    Then `sql/20261014_bank_publish.sql` (the functions that write `job_bank`),
    `sql/20261015_jobright_links.sql` (resolve) and `sql/20261016_agent_finder.sql` (find).
+   For boards too big to list in full: `sql/20261112_last_listed_at.sql`, then
+   `sql/20261112_touch_listed_postings.sql` (its header says what to count first).
 2. Give the role a password: `alter role job_boards_crawler login password '<openssl rand -hex 24>';`
 3. Add the repo secret `BANK_DATABASE_URL`:
    `postgresql://job_boards_crawler.<project-ref>:<password>@<session-pooler-host>:5432/postgres`
