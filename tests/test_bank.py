@@ -241,6 +241,44 @@ def test_an_incomplete_read_stamps_what_it_listed_at_most_once_a_day(listed_bank
     assert all(r["closed_at"] is None and r["changed_at"] in (T0, t1) for r in rows(bank).values())
 
 
+def test_an_incomplete_read_republishes_only_stale_current_postings(listed_bank):
+    bank, now = listed_bank, datetime.now(timezone.utc)
+    interns = [post(1, "Intern"), post(2, "Intern")]
+    crawl_board(bank, the_board(bank), None, now - timedelta(days=10),
+                read=reader_of(Listing(interns, True)))
+    original_changed = {i: r["changed_at"] for i, r in rows(bank).items()}
+    bank.query("update bank_postings set last_listed_at = %s where id = 'gh-acme-1'",
+               (now - timedelta(days=8),))
+    bank.query("update bank_postings set last_listed_at = %s where id = 'gh-acme-2'",
+               (now - timedelta(hours=1),))
+    bank.query("update job_bank set is_active = false, last_seen_at = now() - interval '8 days' "
+               "where source_id = 'gh-acme-1'")
+    bank.query("update job_bank set last_seen_at = now() - interval '8 days' where source_id = 'gh-acme-2'")
+
+    crawl_board(bank, the_board(bank), None, now, read=reader_of(Listing(interns, False)))
+
+    got = site(bank)
+    assert got["gh-acme-1"]["is_active"]
+    assert got["gh-acme-1"]["last_seen_at"] > now - timedelta(minutes=1)
+    assert got["gh-acme-2"]["last_seen_at"] < now - timedelta(days=7)
+    assert {i: r["changed_at"] for i, r in rows(bank).items()} == original_changed
+
+
+def test_incomplete_recovery_does_not_republish_a_now_ineligible_posting(listed_bank):
+    bank, now = listed_bank, datetime.now(timezone.utc)
+    crawl_board(bank, the_board(bank), None, now - timedelta(days=10),
+                read=reader_of(Listing([post(1, "Intern")], True)))
+    bank.query("update bank_postings set last_listed_at = %s where id = 'gh-acme-1'",
+               (now - timedelta(days=8),))
+    bank.query("update job_bank set is_active = false where source_id = 'gh-acme-1'")
+
+    crawl_board(bank, the_board(bank), None, now,
+                read=reader_of(Listing([post(1, "Senior Engineer")], False)))
+
+    assert rows(bank)["gh-acme-1"]["title"] == "Senior Engineer"
+    assert not site(bank)["gh-acme-1"]["is_active"]
+
+
 def test_touch_leaves_rows_an_over_cap_board_has_not_listed_for_a_week_to_the_stale_sweep(listed_bank):
     bank, now = listed_bank, datetime.now(timezone.utc)
     interns = [post(n, "Intern") for n in (1, 2, 3)]

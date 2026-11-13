@@ -107,8 +107,9 @@ class MemoryBank:
     def stored(self, board_id):
         return dict(self.postings)
 
-    def apply(self, board_id, upserts, closed, sched, list_hash, now, listed=()):
+    def apply(self, board_id, upserts, closed, sched, list_hash, now, listed=(), listed_postings=()):
         self.listed = list(listed)
+        self.listed_postings = [p.id for p in listed_postings]
         self.postings.update({p.id: (p.content_hash(), True) for p in upserts})
         self.postings.update({i: (self.postings[i][0], False) for i in closed})
         self.row.update(sched, list_hash=list_hash, last_error=None, last_ok_at=now)
@@ -200,6 +201,7 @@ def test_a_read_that_could_not_list_the_whole_board_says_which_postings_it_did_l
     short = Listing([post(1), post(4)], complete=False, keep={"gh-acme-2"})
     assert bank.read(short, hours=1) == ("changed", 1, 0)
     assert bank.listed == ["gh-acme-1", "gh-acme-2", "gh-acme-4"]  # read or kept, not the unlisted gh-acme-3
+    assert bank.listed_postings == ["gh-acme-1", "gh-acme-4"]  # full records are safe to republish; kept ids are not
     assert bank.open() == ["gh-acme-1", "gh-acme-2", "gh-acme-3", "gh-acme-4"]
 
 
