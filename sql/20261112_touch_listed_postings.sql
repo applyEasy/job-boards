@@ -1,5 +1,9 @@
--- Step 2 of 2 (after 20261112_last_listed_at.sql and at least 7 days of the
--- crawler stamping). bank_touch_published, which marks live job_bank rows as
+-- Final activation step, after:
+--   1. deploying crawler code with two-answer posting confirmation;
+--   2. applying 20261112_last_listed_at.sql and
+--      20261113_posting_gone_confirmation.sql between crawl runs; and
+--   3. collecting at least 7 days of listing stamps and reviewing the count below.
+-- bank_touch_published, which marks live job_bank rows as
 -- seen, stops vouching for postings nobody has listed:
 --
 --   a board whose last read listed everything (bank_boards.list_hash is set)
@@ -20,8 +24,9 @@
 --   where j.is_active group by 1 order by 2 desc;
 --
 -- left_to_the_sweep holds dead postings (the point) and live ones a capped read
--- can never reach. Nothing puts a swept row back when its posting is listed
--- again, so if that number is large, build the per-posting check first.
+-- can never reach. Do not apply this function until the per-posting checks have
+-- completed enough coverage to keep this number within the reviewed rollout
+-- bound; a 200-posting check budget can take many crawls to cover a large board.
 --
 -- Only bank_touch_published changes (the crawler's, 20261014_bank_publish.sql).
 -- bank_touch_job_bank (20261014_boards_bank.sql), the one Backend's ingest calls

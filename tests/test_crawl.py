@@ -103,7 +103,7 @@ class MemoryBank:
     def __init__(self):
         self.row = board(id="greenhouse:acme", provider="greenhouse", key="acme", status="new", last_ok_at=None,
                          list_hash=None, last_error=None)
-        self.postings, self.records = {}, {}
+        self.postings, self.records, self.gone_first_seen = {}, {}, {}
 
     def stored(self, board_id):
         return dict(self.postings)
@@ -111,15 +111,30 @@ class MemoryBank:
     def unconfirmed(self, board_id, listed, before, limit):
         return [self.records[i] for i in self.open() if i not in set(listed)][:limit]
 
-    def apply(self, board_id, upserts, closed, sched, list_hash, now, listed=(), listed_postings=()):
+    def apply(self, board_id, upserts, closed, sched, list_hash, now, listed=(), listed_postings=(), checked_gone=(),
+              confirmed=()):
         self.listed = list(listed)
         self.listed_postings = [p.id for p in listed_postings]
         self.records.update({p.id: p for p in upserts})
         self.postings.update({p.id: (p.content_hash(), True) for p in upserts})
+        for posting_id in {*confirmed, *(p.id for p in upserts)}:
+            self.gone_first_seen.pop(posting_id, None)
+        confirmed_gone = []
+        for posting_id in checked_gone:
+            first = self.gone_first_seen.get(posting_id)
+            if first is not None and first <= now - timedelta(hours=1):
+                confirmed_gone.append(posting_id)
+                self.gone_first_seen.pop(posting_id, None)
+            elif first is None:
+                self.gone_first_seen[posting_id] = now
+        closed = list(dict.fromkeys([*closed, *confirmed_gone]))
         self.postings.update({i: (self.postings[i][0], False) for i in closed})
         self.row.update(sched, list_hash=list_hash, last_error=None, last_ok_at=now)
+        return len(closed)
 
-    def mark_unchanged(self, board_id, sched, now):
+    def mark_unchanged(self, board_id, sched, now, confirmed=()):
+        for posting_id in confirmed:
+            self.gone_first_seen.pop(posting_id, None)
         self.row.update(sched, last_error=None, last_ok_at=now)
 
     def fail(self, board_id, error, sched, now):
@@ -230,13 +245,40 @@ def capped_bank(n=5):
     return bank
 
 
-def test_a_capped_read_closes_what_the_platform_says_is_gone_and_vouches_for_what_is_there():
+def test_a_capped_read_requires_two_separated_gone_answers_and_vouches_for_what_is_there():
     bank, check = capped_bank(), platform({1: False, 2: True, 3: False, 4: None, 5: True})
-    assert bank.read(Listing([post(1)], complete=False), hours=1, gone=check) == ("changed", 0, 2)
+    assert bank.read(Listing([post(1)], complete=False), hours=1, gone=check) == ("changed", 0, 0)
     assert check.asked == [1, 2, 3, 4, 5]  # the posting it listed first, then every one it did not
-    assert bank.open() == ["gh-acme-1", "gh-acme-3", "gh-acme-4"]  # can't tell: stays open
+    assert len(bank.open()) == 5  # one ABSENT and can't tell both stay open
     assert bank.listed == ["gh-acme-1", "gh-acme-3"]  # stamped, so the touch keeps vouching for it
     assert bank.listed_postings == ["gh-acme-1", "gh-acme-3"]  # full records: a swept one goes back up
+    check.asked.clear()
+    assert bank.read(Listing([post(1)], complete=False), hours=2, gone=check) == ("changed", 0, 2)
+    assert bank.open() == ["gh-acme-1", "gh-acme-3", "gh-acme-4"]
+
+
+def test_a_transient_gone_answer_is_cleared_by_a_later_present_answer():
+    bank = capped_bank(2)
+    assert bank.read(Listing([post(1)], complete=False), hours=1,
+                     gone=platform({1: False, 2: True})) == ("changed", 0, 0)
+    assert bank.read(Listing([post(1)], complete=False), hours=2,
+                     gone=platform({1: False, 2: False})) == ("changed", 0, 0)
+    assert bank.gone_first_seen == {} and len(bank.open()) == 2
+    assert bank.read(Listing([post(1)], complete=False), hours=3,
+                     gone=platform({1: False, 2: True})) == ("changed", 0, 0)
+    assert len(bank.open()) == 2  # PRESENT reset the confirmation sequence
+
+
+def test_a_complete_unchanged_listing_clears_prior_gone_evidence():
+    bank = capped_bank(2)
+    assert bank.read(Listing([post(1)], complete=False), hours=1,
+                     gone=platform({1: False, 2: True})) == ("changed", 0, 0)
+    assert bank.gone_first_seen == {"gh-acme-2": NOW + timedelta(hours=1)}
+    assert bank.read(Listing([post(1), post(2)], complete=True), hours=2) == ("unchanged", 0, 0)
+    assert bank.gone_first_seen == {}
+    assert bank.read(Listing([post(1)], complete=False), hours=3,
+                     gone=platform({1: False, 2: True})) == ("changed", 0, 0)
+    assert len(bank.open()) == 2
 
 
 def test_a_capped_read_closes_nothing_when_a_posting_it_just_listed_does_not_check_as_there():
@@ -249,15 +291,15 @@ def test_a_capped_read_closes_nothing_when_a_posting_it_just_listed_does_not_che
 
 def test_a_throttled_check_stops_asking_and_keeps_what_it_learned():
     bank, check = capped_bank(), platform({1: False, 2: True, 4: True}, throttled={3})
-    assert bank.read(Listing([post(1)], complete=False), hours=1, gone=check) == ("changed", 0, 1)
+    assert bank.read(Listing([post(1)], complete=False), hours=1, gone=check) == ("changed", 0, 0)
     assert check.asked == [1, 2, 3]
-    assert bank.open() == ["gh-acme-1", "gh-acme-3", "gh-acme-4", "gh-acme-5"]
+    assert len(bank.open()) == 5  # the first ABSENT is evidence, not a close
 
 
 def test_a_capped_read_asks_about_at_most_checks_per_read_postings(monkeypatch):
     monkeypatch.setattr(crawl_module, "CHECKS_PER_READ", 2)
     bank, check = capped_bank(), platform({1: False, 2: True, 3: True, 4: True, 5: True})
-    assert bank.read(Listing([post(1)], complete=False), hours=1, gone=check) == ("changed", 0, 2)
+    assert bank.read(Listing([post(1)], complete=False), hours=1, gone=check) == ("changed", 0, 0)
     assert check.asked == [1, 2, 3]
 
 
