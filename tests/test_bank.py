@@ -296,6 +296,46 @@ def test_touch_leaves_rows_an_over_cap_board_has_not_listed_for_a_week_to_the_st
     assert bank.touch_published() == 2
 
 
+def test_unconfirmed_is_open_postings_a_read_did_not_list_and_nobody_confirmed_lately(listed_bank):
+    bank, now = listed_bank, datetime.now(timezone.utc)
+    crawl_board(bank, the_board(bank), None, now - timedelta(days=10),
+                read=reader_of(Listing([post(n) for n in range(1, 7)], True)))
+    for n, age in ((1, timedelta(days=1)), (2, timedelta(days=5)), (6, timedelta(days=4))):
+        bank.query("update bank_postings set last_listed_at = %s where id = %s", (now - age, f"gh-acme-{n}"))
+    bank.query("update bank_postings set closed_at = now() where id = 'gh-acme-5'")
+    got = bank.unconfirmed("greenhouse:acme", ["gh-acme-3"], now - timedelta(days=3), 10)
+    # Never confirmed first, then the oldest; 1 was confirmed a day ago, 3 was just listed, 5 is closed.
+    assert [p.id for p in got] == ["gh-acme-4", "gh-acme-2", "gh-acme-6"]
+    assert (got[0].url, got[0].title, got[0].locations, got[0].source) == (post(4).url, "Engineer", ["NYC"],
+                                                                         "ats_greenhouse")
+    assert [p.id for p in bank.unconfirmed("greenhouse:acme", ["gh-acme-3"], now - timedelta(days=3), 1)] == [
+        "gh-acme-4"]
+
+
+def test_without_the_last_listed_column_nothing_is_unconfirmed(bank):
+    crawl_board(bank, the_board(bank), None, T0, read=reader_of(Listing([post(1)], True)))
+    assert bank.unconfirmed("greenhouse:acme", [], T0 + timedelta(days=30), 10) == []
+
+
+def test_a_checked_posting_that_is_gone_comes_down_and_one_that_is_there_goes_back_up(listed_bank):
+    bank, now = listed_bank, datetime.now(timezone.utc)
+    interns = [post(n, "Intern") for n in (1, 2, 3)]
+    crawl_board(bank, the_board(bank), None, now - timedelta(days=10), read=reader_of(Listing(interns, True)))
+    # gh-acme-3 was never stamped, so the touch stopped vouching for it and Backend's sweep took it down.
+    bank.query("update job_bank set is_active = false where source_id = 'gh-acme-3'")
+
+    def check(url, http):
+        return {"1": False, "2": True, "3": False}[url.rsplit("/", 1)[-1]]
+    assert crawl_board(bank, the_board(bank), None, now, read=reader_of(Listing(interns[:1], False)),
+                       gone=check) == ("changed", 0, 1)
+
+    got, live = rows(bank), site(bank)
+    assert got["gh-acme-2"]["closed_at"] == now and not live["gh-acme-2"]["is_active"]
+    assert got["gh-acme-3"]["closed_at"] is None and got["gh-acme-3"]["last_listed_at"] == now
+    assert live["gh-acme-3"]["is_active"]  # confirmed there: back on the site
+    assert the_board(bank)["open_postings"] == 2
+
+
 def test_stats_counts_boards_postings_and_failing_ones(bank):
     crawl_board(bank, the_board(bank), None, T0, read=reader_of(Listing([post(1), post(2)], True)))
     bank.add_boards([(Board("lever", "zoox"), "https://jobs.lever.co/zoox", "test")])

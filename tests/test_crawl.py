@@ -91,6 +91,7 @@ def test_a_dead_board_that_answers_again_is_active():
 # --- one read of one board, against a bank kept in memory ---
 
 from jobboards.crawl import DEAD_AFTER_DAYS, DUE_EARLY_MINUTES, crawl_board  # noqa: E402
+from jobboards.http import Throttled  # noqa: E402
 from jobboards.readers import ReadFailed  # noqa: E402
 
 EMPTY = Listing([], complete=True)
@@ -102,14 +103,18 @@ class MemoryBank:
     def __init__(self):
         self.row = board(id="greenhouse:acme", provider="greenhouse", key="acme", status="new", last_ok_at=None,
                          list_hash=None, last_error=None)
-        self.postings = {}
+        self.postings, self.records = {}, {}
 
     def stored(self, board_id):
         return dict(self.postings)
 
+    def unconfirmed(self, board_id, listed, before, limit):
+        return [self.records[i] for i in self.open() if i not in set(listed)][:limit]
+
     def apply(self, board_id, upserts, closed, sched, list_hash, now, listed=(), listed_postings=()):
         self.listed = list(listed)
         self.listed_postings = [p.id for p in listed_postings]
+        self.records.update({p.id: p for p in upserts})
         self.postings.update({p.id: (p.content_hash(), True) for p in upserts})
         self.postings.update({i: (self.postings[i][0], False) for i in closed})
         self.row.update(sched, list_hash=list_hash, last_error=None, last_ok_at=now)
@@ -125,13 +130,13 @@ class MemoryBank:
     def open(self):
         return sorted(i for i, (_, is_open) in self.postings.items() if is_open)
 
-    def read(self, answer, hours):
+    def read(self, answer, hours, gone=None):
         """One read of the board `hours` after NOW; an exception is a read that failed."""
         def reader(board, http, known):
             if isinstance(answer, Exception):
                 raise answer
             return answer
-        return crawl_board(self, dict(self.row), None, NOW + timedelta(hours=hours), read=reader)
+        return crawl_board(self, dict(self.row), None, NOW + timedelta(hours=hours), read=reader, gone=gone)
 
 
 def test_one_empty_answer_closes_nothing_and_the_board_is_read_again_in_an_hour():
@@ -203,6 +208,65 @@ def test_a_read_that_could_not_list_the_whole_board_says_which_postings_it_did_l
     assert bank.listed == ["gh-acme-1", "gh-acme-2", "gh-acme-4"]  # read or kept, not the unlisted gh-acme-3
     assert bank.listed_postings == ["gh-acme-1", "gh-acme-4"]  # full records are safe to republish; kept ids are not
     assert bank.open() == ["gh-acme-1", "gh-acme-2", "gh-acme-3", "gh-acme-4"]
+
+
+# --- a capped read asks the platform about postings it could not list ---
+
+def platform(answers, throttled=()):
+    """A posting check that answers from {posting number: True gone | False there | None can't tell}."""
+    def check(url, http):
+        n = int(url.rsplit("/", 1)[-1])
+        check.asked.append(n)
+        if n in throttled:
+            raise Throttled("boards.greenhouse.io")
+        return answers.get(n)
+    check.asked = []
+    return check
+
+
+def capped_bank(n=5):
+    bank = MemoryBank()
+    bank.read(Listing([post(i) for i in range(1, n + 1)], complete=True), hours=0)
+    return bank
+
+
+def test_a_capped_read_closes_what_the_platform_says_is_gone_and_vouches_for_what_is_there():
+    bank, check = capped_bank(), platform({1: False, 2: True, 3: False, 4: None, 5: True})
+    assert bank.read(Listing([post(1)], complete=False), hours=1, gone=check) == ("changed", 0, 2)
+    assert check.asked == [1, 2, 3, 4, 5]  # the posting it listed first, then every one it did not
+    assert bank.open() == ["gh-acme-1", "gh-acme-3", "gh-acme-4"]  # can't tell: stays open
+    assert bank.listed == ["gh-acme-1", "gh-acme-3"]  # stamped, so the touch keeps vouching for it
+    assert bank.listed_postings == ["gh-acme-1", "gh-acme-3"]  # full records: a swept one goes back up
+
+
+def test_a_capped_read_closes_nothing_when_a_posting_it_just_listed_does_not_check_as_there():
+    """An API change that answers 'gone' for everything must not empty the board (FIN-67 item 1)."""
+    for canary in (True, None):
+        bank, check = capped_bank(), platform({1: canary, 2: True, 3: True, 4: True, 5: True})
+        assert bank.read(Listing([post(1)], complete=False), hours=1, gone=check) == ("changed", 0, 0)
+        assert check.asked == [1] and len(bank.open()) == 5
+
+
+def test_a_throttled_check_stops_asking_and_keeps_what_it_learned():
+    bank, check = capped_bank(), platform({1: False, 2: True, 4: True}, throttled={3})
+    assert bank.read(Listing([post(1)], complete=False), hours=1, gone=check) == ("changed", 0, 1)
+    assert check.asked == [1, 2, 3]
+    assert bank.open() == ["gh-acme-1", "gh-acme-3", "gh-acme-4", "gh-acme-5"]
+
+
+def test_a_capped_read_asks_about_at_most_checks_per_read_postings(monkeypatch):
+    monkeypatch.setattr(crawl_module, "CHECKS_PER_READ", 2)
+    bank, check = capped_bank(), platform({1: False, 2: True, 3: True, 4: True, 5: True})
+    assert bank.read(Listing([post(1)], complete=False), hours=1, gone=check) == ("changed", 0, 2)
+    assert check.asked == [1, 2, 3]
+
+
+def test_a_complete_read_or_a_platform_without_a_check_asks_nothing():
+    bank, check = capped_bank(), platform({})
+    bank.read(Listing([post(1)], complete=True), hours=1, gone=check)
+    assert check.asked == []
+    bank = capped_bank()  # greenhouse lists in full: it has no check of its own
+    assert bank.read(Listing([post(1)], complete=False), hours=1) == ("changed", 0, 0)
 
 
 # --- parallel crawlers: shards split the due boards by the host they are read from ---

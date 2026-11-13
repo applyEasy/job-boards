@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from jobboards.boards import Board
-from jobboards.readers import READERS, Listing, NotABoard, Posting
+from jobboards.readers import GONE, READERS, Listing, NotABoard, Posting
 
 log = logging.getLogger("jobboards.crawl")
 
@@ -25,6 +25,11 @@ DUE_EARLY_MINUTES = 45
 EMPTY_DAYS, DEAD_AFTER_DAYS, DEAD_RECHECK_DAYS = 7, 7, 30
 EMPTY_ONCE = "EmptyListing: "  # last_error of a board whose last read was an empty answer nobody believed yet
 NEEDS_KNOWN = {"icims"}  # readers that skip postings the bank already holds unchanged
+# A capped read asks the platform about this many postings it could not list, each one nobody
+# confirmed for RECHECK_DAYS: well inside the 7 days bank_touch_published vouches for a confirmation.
+# ponytail: a fixed share per read, ~4 days to clear Accenture's ~19k backlog at hourly reads;
+# size it by each board's backlog if a bigger board needs faster.
+CHECKS_PER_READ, RECHECK_DAYS = 200, 3
 
 # Boards on these platforms share one API host; the rest are their own host.
 API_HOST = {"greenhouse": "boards-api.greenhouse.io", "lever": "api.lever.co", "ashby": "api.ashbyhq.com",
@@ -78,8 +83,30 @@ def schedule(row: Dict[str, Any], outcome: str, now: datetime) -> Dict[str, Any]
             "failing_since": since, "next_check_at": now + wait}
 
 
+def check_unlisted(bank: Any, board_id: str, listing: Listing, listed: List[str], gone: Callable,
+                   http: Any, now: datetime) -> Tuple[List[str], List[Posting]]:
+    """A capped read closes nothing, so it asks the platform about postings it did not list:
+    (ids gone, postings still there). A posting it just listed is asked about first; if that one
+    doesn't check as there, no answer is believed (an API change must not empty a board)."""
+    unlisted = bank.unconfirmed(board_id, listed, now - timedelta(days=RECHECK_DAYS), CHECKS_PER_READ)
+    gone_ids: List[str] = []
+    there: List[Posting] = []
+    try:
+        if not unlisted or not listing.postings or gone(listing.postings[0].url, http) is not False:
+            return [], []
+        for posting in unlisted:
+            answer = gone(posting.url, http)
+            if answer is True:
+                gone_ids.append(posting.id)
+            elif answer is False:
+                there.append(posting)
+    except Exception as exc:  # Throttled, a timeout: the rest wait for the next read
+        log.warning("board %s: posting checks stopped: %s: %s", board_id, type(exc).__name__, exc)
+    return gone_ids, there
+
+
 def crawl_board(bank: Any, row: Dict[str, Any], http: Any, now: datetime,
-                read: Optional[Callable] = None) -> Tuple[str, int, int]:
+                read: Optional[Callable] = None, gone: Optional[Callable] = None) -> Tuple[str, int, int]:
     """Read one board and write what changed. Returns (outcome, postings written, postings closed)."""
     board = Board(row["provider"], row["key"], row.get("company_name") or "")
     read = read or READERS[row["provider"]]
@@ -106,8 +133,14 @@ def crawl_board(bank: Any, row: Dict[str, Any], http: Any, now: datetime,
         else:
             outcome = "empty" if empty else "changed" if (upserts or closed or not listing.complete) else "unchanged"
             listed = [] if listing.complete else sorted({p.id for p in listing.postings} | listing.keep)
+            there: List[Posting] = []
+            gone = gone or GONE.get(row["provider"])
+            if listed and gone:
+                gone_ids, there = check_unlisted(bank, row["id"], listing, listed, gone, http, now)
+                closed = closed + gone_ids
+                listed = sorted({*listed, *(p.id for p in there)})  # confirmed there counts as listed
             bank.apply(row["id"], upserts, closed, schedule(row, outcome, now), digest, now,
-                       listed, listing.postings if listed else ())
+                       listed, [*listing.postings, *there] if listed else ())
             return outcome, len(upserts), len(closed)
     bank.fail(row["id"], error[:500], schedule(row, outcome, now), now)
     return outcome, 0, 0

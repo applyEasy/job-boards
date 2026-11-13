@@ -74,6 +74,24 @@ class Bank:
         return {r["id"]: r["source_updated_at"].isoformat() if r["source_updated_at"] else None for r in self.query(
             "select id, source_updated_at from bank_postings where board_id = %s and closed_at is null", (board_id,))}
 
+    def unconfirmed(self, board_id: str, listed: Sequence[str], before: datetime, limit: int) -> List[Posting]:
+        """Open postings of this board a read did not list and nobody confirmed since `before`, as
+        their full records: never confirmed first, then the oldest. Ties (a whole read is stamped at
+        one instant) are shuffled per read, so the same can't-tell postings don't hold the front.
+        ponytail: a posting whose answer stays can't-tell keeps its old stamp at the front; give
+        it a checked_at column if those ever fill a read's CHECKS_PER_READ."""
+        with self.lock:
+            if not self._has_last_listed():
+                return []
+        return [Posting(**{**r, "posted_at": r["posted_at"] and r["posted_at"].isoformat(),
+                           "source_updated_at": r["source_updated_at"] and r["source_updated_at"].isoformat()})
+                for r in self.query(
+                    "select id, source, company_name, title, url, locations, workplace, employment_type, department, "
+                    "apply_url, posted_at, source_updated_at from bank_postings where board_id = %s "
+                    "and closed_at is null and id <> all(%s) and (last_listed_at is null or last_listed_at <= %s) "
+                    "order by last_listed_at nulls first, md5(id || %s) limit %s",
+                    (board_id, list(listed), before, before.isoformat(), limit))]
+
     def _board_update(self, board_id: str, sched: Dict[str, Any], extra: str = "", params: Sequence[Any] = ()) -> None:
         self.conn.execute(
             "update bank_boards set status = %s, next_check_at = %s, interval_hours = %s, fail_count = %s, "
@@ -117,10 +135,11 @@ class Bank:
                 # a capped read could not reach for a week. A later read of that same posting
                 # must put it back on the site even when its bank content did not change.
                 # Limit this to stale stamps owned by this board; fresh listed rows need only
-                # their daily stamp and changed rows were already published above.
+                # their daily stamp and changed rows were already published above. Never stamped
+                # is stale too: the touch never vouched for it (each posting is put back once).
                 stale = {r["id"] for r in self.conn.execute(
                     "select id from bank_postings where board_id = %s and id = any(%s) and closed_at is null "
-                    "and last_listed_at <= %s::timestamptz - interval '7 days'",
+                    "and (last_listed_at is null or last_listed_at <= %s::timestamptz - interval '7 days')",
                     (board_id, list(listed_by_id), now))} if listed_by_id else set()
                 changed = {p.id for p in upserts}
                 self._publish([listed_by_id[i] for i in stale - changed], [])

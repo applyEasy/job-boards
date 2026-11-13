@@ -347,3 +347,63 @@ def test_jibe_listing_one_job_on_two_pages_is_still_complete(monkeypatch):
         return json.dumps({"jobs": pages.get(page, []), "totalCount": 4})
     listing, _ = read("jibe", "careers.noblis.org", {"https://careers.noblis.org/api/jobs": answer})
     assert len(listing.postings) == 3 and listing.complete
+
+
+# --- is a posting a capped read could not list still there? (True gone, False there, None can't tell) ---
+# The answers below are what each platform sent on 2026-11-12 for live postings, postings Simplify
+# lists as closed, and ids that never existed.
+
+from jobboards.readers import GONE  # noqa: E402
+
+WD_URL = "https://acme.wd5.myworkdayjobs.com/en-US/External/job/Austin-TX/Software-Intern_R123-1"
+WD_API = "https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/External/job/Austin-TX/Software-Intern_R123-1"
+
+
+def gone(provider, url, answer):
+    http = FakeHttp({"https://": answer})
+    return GONE[provider](url, http), http
+
+
+def test_workday_reads_a_closed_or_missing_posting_as_gone_and_a_live_one_as_there():
+    closed = (403, '{"errorCode":"S22","httpStatus":403,"message":"permission denied"}')
+    missing = (404, '{"errorCode":"S21","httpStatus":404,"message":"not found: Job_Posting_Anchor_ID=x"}')
+    live = (200, '{"jobPostingInfo":{"title":"Software Intern","posted":true,"canApply":true}}')
+    assert gone("workday", WD_URL, closed)[0] is True
+    assert gone("workday", WD_URL, missing)[0] is True
+    answer, http = gone("workday", WD_URL, live)
+    assert answer is False and http.calls == [("GET", WD_API, None)]
+
+
+def test_workday_cant_tell_from_a_bot_wall_an_outage_or_an_unposted_job():
+    for answer in ((403, "<html>Access denied</html>"), (500, "{}"), (200, "<html></html>"),
+                   (200, '{"jobPostingInfo":{"title":"Software Intern","posted":false}}')):
+        assert gone("workday", WD_URL, answer)[0] is None, answer
+
+
+def test_smartrecruiters_reads_an_inactive_or_missing_posting_as_gone_and_an_active_one_as_there():
+    url = "https://jobs.smartrecruiters.com/BoschGroup/744000161409674"
+    assert gone("smartrecruiters", url, (200, '{"id":"744000161409674","active":false}'))[0] is True
+    assert gone("smartrecruiters", url, (404, '{"httpCode":404,"code":"RESOURCE_NOT_FOUND"}'))[0] is True
+    answer, http = gone("smartrecruiters", url, (200, '{"id":"744000161409674","active":true}'))
+    assert answer is False
+    assert http.calls == [("GET", "https://api.smartrecruiters.com/v1/companies/BoschGroup/postings/744000161409674", None)]
+    # A posting id another company holds, an outage, a 404 that isn't the API's own: can't tell.
+    for other in ((400, '{"code":"ILLEGAL_ARGUMENT"}'), (500, "{}"), (404, "<html>Not Found</html>")):
+        assert gone("smartrecruiters", url, other)[0] is None, other
+
+
+def test_oracle_reads_a_requisition_the_site_no_longer_has_as_gone_and_a_listed_one_as_there():
+    url = "https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210616021"
+    assert gone("oracle", url, (200, '{"items":[],"count":0,"hasMore":false}'))[0] is True
+    answer, http = gone("oracle", url, (200, '{"items":[{"Id":"210616021","Title":"Analyst"}],"count":1}'))
+    assert answer is False
+    assert http.calls == [("GET", "https://jpmc.fa.oraclecloud.com/hcmRestApi/resources/latest/"
+                           'recruitingCEJobRequisitionDetails?onlyData=true&finder=ById;Id="210616021",'
+                           "siteNumber=CX_1001", None)]
+    for other in ((500, "{}"), (200, "<html></html>"), (200, '{"items":[{"Id":"999"}],"count":1}'), (200, '{}')):
+        assert gone("oracle", url, other)[0] is None, other
+
+
+def test_a_url_no_reader_wrote_cant_be_told():
+    for provider in GONE:
+        assert gone(provider, "https://example.com/somewhere", (200, "{}"))[0] is None

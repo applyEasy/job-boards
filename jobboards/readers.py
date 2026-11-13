@@ -613,6 +613,74 @@ def read_successfactors(board: Board, http: Any, known: Dict[str, Optional[str]]
     return Listing(out, complete=complete and total is not None and startrow >= total)
 
 
+# --- is one posting a capped read could not list still there? True gone, False there, None can't tell ---
+# Gone is only an answer each platform sent on 2026-11-12 for postings Simplify lists as closed, or for
+# ids that never existed. A bot wall, an outage or a shape nobody has seen yet closes nothing.
+
+_WORKDAY_URL = re.compile(r"^https://([^/]+\.myworkdayjobs\.com)/(?:[a-z]{2}-[A-Z]{2}/)?([^/]+)(/job/.+)$")
+_SMART_URL = re.compile(r"^https://jobs\.smartrecruiters\.com/([^/]+)/([^/]+)$")
+_ORACLE_URL = re.compile(r"^https://([^/]+\.oraclecloud\.com)/hcmUI/CandidateExperience/[^/]+/sites/([^/]+)/job/(\d+)$")
+
+
+def _object(reply: Any) -> dict:
+    try:
+        data = reply.json()
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def gone_workday(url: str, http: Any) -> Optional[bool]:
+    m = _WORKDAY_URL.match(url)
+    if not m:
+        return None
+    host, site, path = m.groups()
+    reply = http.get(f"https://{host}/wday/cxs/{host.split('.')[0].lower()}/{site}{path}",
+                     headers={"Accept": "application/json"})
+    data = _object(reply)
+    if (reply.status_code, data.get("errorCode")) in ((403, "S22"), (404, "S21")):  # closed; never was
+        return True
+    info = data.get("jobPostingInfo") if reply.status_code == 200 else None
+    return False if isinstance(info, dict) and info.get("posted") is not False else None
+
+
+def gone_smartrecruiters(url: str, http: Any) -> Optional[bool]:
+    m = _SMART_URL.match(url)
+    if not m:
+        return None
+    company, job_id = m.groups()
+    reply = http.get(f"https://api.smartrecruiters.com/v1/companies/{company}/postings/{job_id}")
+    data = _object(reply)
+    if reply.status_code == 404 and data.get("code") == "RESOURCE_NOT_FOUND":
+        return True
+    if reply.status_code == 200 and str(data.get("id")) == job_id and isinstance(data.get("active"), bool):
+        return not data["active"]  # a closed posting still answers, with active: false
+    return None
+
+
+def gone_oracle(url: str, http: Any) -> Optional[bool]:
+    m = _ORACLE_URL.match(url)
+    if not m:
+        return None
+    host, site, req_id = m.groups()
+    reply = http.get(f"https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails"
+                     f'?onlyData=true&finder=ById;Id="{req_id}",siteNumber={site}', headers={"Accept": "application/json"})
+    data = _object(reply)
+    items = data.get("items") if reply.status_code == 200 else None
+    if items == [] and data.get("count") == 0:  # closed and never was answer alike
+        return True
+    if isinstance(items, list) and items and isinstance(items[0], dict) and str(items[0].get("Id")) == req_id:
+        return False
+    return None
+
+
+GONE: Dict[str, Callable[[str, Any], Optional[bool]]] = {
+    "workday": gone_workday,
+    "smartrecruiters": gone_smartrecruiters,
+    "oracle": gone_oracle,
+}
+
+
 READERS: Dict[str, Reader] = {
     "greenhouse": read_greenhouse,
     "lever": read_lever,
