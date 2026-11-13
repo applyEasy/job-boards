@@ -106,7 +106,8 @@ def crawl_board(bank: Any, row: Dict[str, Any], http: Any, now: datetime,
         else:
             outcome = "empty" if empty else "changed" if (upserts or closed or not listing.complete) else "unchanged"
             listed = [] if listing.complete else sorted({p.id for p in listing.postings} | listing.keep)
-            bank.apply(row["id"], upserts, closed, schedule(row, outcome, now), digest, now, listed)
+            bank.apply(row["id"], upserts, closed, schedule(row, outcome, now), digest, now,
+                       listed, listing.postings if listed else ())
             return outcome, len(upserts), len(closed)
     bank.fail(row["id"], error[:500], schedule(row, outcome, now), now)
     return outcome, 0, 0

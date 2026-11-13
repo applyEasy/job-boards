@@ -90,8 +90,9 @@ class Bank:
         return self._stamps_listed
 
     def apply(self, board_id: str, upserts: List[Posting], closed: List[str], sched: Dict[str, Any],
-              list_hash: Optional[str], now: datetime, listed: Sequence[str] = ()) -> None:
-        """`listed`: the postings a read that could not list its whole board did list."""
+              list_hash: Optional[str], now: datetime, listed: Sequence[str] = (),
+              listed_postings: Sequence[Posting] = ()) -> None:
+        """`listed`: ids a partial read listed; `listed_postings`: their current full records."""
         with self.lock, self.conn.transaction():
             if upserts:
                 with self.conn.cursor() as cur:
@@ -111,6 +112,18 @@ class Bank:
                 upserts = list({p.id: p for p in upserts if p.id in owned}.values())
             self._publish(upserts, closed)
             if listed and self._has_last_listed():
+                listed_by_id = {p.id: p for p in listed_postings}
+                # Once the touch migration is enabled, Backend may have swept a posting that
+                # a capped read could not reach for a week. A later read of that same posting
+                # must put it back on the site even when its bank content did not change.
+                # Limit this to stale stamps owned by this board; fresh listed rows need only
+                # their daily stamp and changed rows were already published above.
+                stale = {r["id"] for r in self.conn.execute(
+                    "select id from bank_postings where board_id = %s and id = any(%s) and closed_at is null "
+                    "and last_listed_at <= %s::timestamptz - interval '7 days'",
+                    (board_id, list(listed_by_id), now))} if listed_by_id else set()
+                changed = {p.id for p in upserts}
+                self._publish([listed_by_id[i] for i in stale - changed], [])
                 # Such a read closes nothing, so it says what is still listed, once a day each
                 # (whichever board holds the posting): bank_touch_published vouches only for those.
                 self.conn.execute(
