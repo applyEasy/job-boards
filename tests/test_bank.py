@@ -16,7 +16,7 @@ pytestmark = pytest.mark.skipif(not DSN, reason="BANK_TEST_DATABASE_URL not set"
 
 from jobboards.bank import Bank  # noqa: E402
 from jobboards.boards import Board  # noqa: E402
-from jobboards.crawl import crawl_board  # noqa: E402
+from jobboards.crawl import DUE_EARLY_MINUTES, crawl_board  # noqa: E402
 from jobboards.readers import Listing, NotABoard, Posting, ReadFailed  # noqa: E402
 
 SQL = Path(__file__).parent.parent / "sql"
@@ -118,6 +118,23 @@ def test_failures_keep_postings_until_the_board_is_dead(bank):
     assert the_board(bank)["status"] == "dead" and rows(bank)["gh-acme-1"]["closed_at"] == late
 
 
+def test_one_empty_answer_keeps_every_posting_up_and_a_second_in_a_row_takes_them_down(bank):
+    crawl_board(bank, the_board(bank), None, T0, read=reader_of(Listing([post(1, "Intern"), post(2)], True)))
+    t1 = T0 + timedelta(hours=1)
+    crawl_board(bank, the_board(bank), None, t1, read=reader_of(Listing([], True)))
+    b = the_board(bank)
+    assert all(r["closed_at"] is None for r in rows(bank).values()) and site(bank)["gh-acme-1"]["is_active"]
+    assert b["status"] == "active" and b["open_postings"] == 2 and b["fail_count"] == 1
+    assert b["next_check_at"] == t1 + timedelta(hours=1, minutes=DUE_EARLY_MINUTES)
+    assert b["last_error"].startswith("EmptyListing: ")
+    t2 = t1 + timedelta(hours=1)
+    crawl_board(bank, the_board(bank), None, t2, read=reader_of(Listing([], True)))
+    b = the_board(bank)
+    assert all(r["closed_at"] == t2 for r in rows(bank).values()) and not site(bank)["gh-acme-1"]["is_active"]
+    assert b["status"] == "empty" and b["open_postings"] == 0 and b["fail_count"] == 0 and b["last_error"] is None
+    assert b["next_check_at"] == t2 + timedelta(days=7)
+
+
 def test_never_read_board_that_is_not_found_is_dead_at_once(bank):
     crawl_board(bank, the_board(bank), None, T0, read=reader_of(NotABoard("HTTP 404")))
     assert the_board(bank)["status"] == "dead"
@@ -176,6 +193,69 @@ def test_touch_marks_day_old_rows_the_bank_holds_open_as_seen(bank):
     bank.query("update job_bank set last_seen_at = now() - interval '1 hour' where source_id = 'gh-acme-2'")
     assert bank.touch_published() == 1
     assert bank.touch_published() == 0
+
+
+# --- boards too big to list in full (sql/20261112_last_listed_at.sql, then 20261112_touch_listed_postings.sql) ---
+
+def has_last_listed(bank):
+    return bool(bank.query("select 1 from information_schema.columns where table_name = 'bank_postings' "
+                           "and column_name = 'last_listed_at'"))
+
+
+@pytest.fixture
+def listed_bank(bank):
+    """The bank after both migrations, which the database's owner applies by hand."""
+    with psycopg.connect(DSN, autocommit=True) as conn:
+        conn.execute((SQL / "20261112_last_listed_at.sql").read_text())
+        conn.execute((SQL / "20261112_touch_listed_postings.sql").read_text())
+    return bank
+
+
+def test_without_the_last_listed_column_an_incomplete_read_writes_as_before(bank):
+    assert not has_last_listed(bank)
+    crawl_board(bank, the_board(bank), None, T0, read=reader_of(Listing([post(1, "Intern"), post(2)], True)))
+    crawl_board(bank, the_board(bank), None, T0 + timedelta(hours=1),
+                read=reader_of(Listing([post(1, "Intern"), post(3)], False)))
+    got = rows(bank)
+    assert set(got) == {"gh-acme-1", "gh-acme-2", "gh-acme-3"}
+    assert all(r["closed_at"] is None for r in got.values())
+    assert the_board(bank)["open_postings"] == 3 and the_board(bank)["last_error"] is None
+    bank.query("update job_bank set last_seen_at = now() - interval '2 days'")
+    assert bank.touch_published() == 1  # the function as it was: every live row the bank holds open
+
+
+def test_an_incomplete_read_stamps_what_it_listed_at_most_once_a_day(listed_bank):
+    bank = listed_bank
+    assert has_last_listed(bank)
+    crawl_board(bank, the_board(bank), None, T0, read=reader_of(Listing([post(1), post(2), post(3)], True)))
+    assert {r["last_listed_at"] for r in rows(bank).values()} == {None}  # a complete read stamps nothing
+    t1, t2, t3 = T0 + timedelta(hours=1), T0 + timedelta(hours=2), T0 + timedelta(hours=26)
+    crawl_board(bank, the_board(bank), None, t1, read=reader_of(Listing([post(1), post(4)], False)))
+    assert {i: r["last_listed_at"] for i, r in rows(bank).items()} == {
+        "gh-acme-1": t1, "gh-acme-2": None, "gh-acme-3": None, "gh-acme-4": t1}
+    crawl_board(bank, the_board(bank), None, t2, read=reader_of(Listing([post(1)], False, keep={"gh-acme-2"})))
+    got = rows(bank)
+    assert got["gh-acme-1"]["last_listed_at"] == t1 and got["gh-acme-2"]["last_listed_at"] == t2
+    crawl_board(bank, the_board(bank), None, t3, read=reader_of(Listing([post(1)], False)))
+    assert rows(bank)["gh-acme-1"]["last_listed_at"] == t3
+    assert all(r["closed_at"] is None and r["changed_at"] in (T0, t1) for r in rows(bank).values())
+
+
+def test_touch_leaves_rows_an_over_cap_board_has_not_listed_for_a_week_to_the_stale_sweep(listed_bank):
+    bank, now = listed_bank, datetime.now(timezone.utc)
+    interns = [post(n, "Intern") for n in (1, 2, 3)]
+    crawl_board(bank, the_board(bank), None, now - timedelta(days=10), read=reader_of(Listing(interns, True)))
+    for age, listed in ((timedelta(days=8), interns[:1]), (timedelta(hours=1), interns[1:2])):
+        crawl_board(bank, the_board(bank), None, now - age, read=reader_of(Listing(listed, False)))
+    bank.query("update job_bank set last_seen_at = now() - interval '2 days'")
+    assert bank.touch_published() == 1  # gh-acme-2 only: 1 was last listed 8 days ago, 3 never
+    may_run = "select has_function_privilege(%s, 'public.bank_touch_published()', 'execute') as yes"
+    assert [bank.query(may_run, (role,))[0]["yes"] for role in ("job_boards_crawler", "anon")] == [True, False]
+    fresh = {i for i, r in site(bank).items() if r["last_seen_at"] > now - timedelta(days=1)}
+    assert fresh == {"gh-acme-2"} and all(r["is_active"] for r in site(bank).values())
+    # A board that lists in full again vouches for everything it holds open.
+    crawl_board(bank, the_board(bank), None, now, read=reader_of(Listing(interns, True)))
+    assert bank.touch_published() == 2
 
 
 def test_stats_counts_boards_postings_and_failing_ones(bank):

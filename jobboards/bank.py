@@ -37,6 +37,7 @@ class Bank:
         # prepare_threshold=None: the Supabase pooler can't keep prepared statements.
         self.conn = psycopg.connect(dsn, autocommit=True, prepare_threshold=None, row_factory=dict_row)
         self.lock = threading.Lock()  # one connection, many crawl threads
+        self._stamps_listed: Optional[bool] = None  # asked once: is bank_postings.last_listed_at there?
 
     def close(self) -> None:
         self.conn.close()
@@ -80,8 +81,17 @@ class Bank:
             (sched["status"], sched["next_check_at"], sched["interval_hours"], sched["fail_count"],
              sched["failing_since"], *params, board_id))
 
+    def _has_last_listed(self) -> bool:
+        """sql/20261112_last_listed_at.sql adds the column; a database without it is written as before."""
+        if self._stamps_listed is None:
+            self._stamps_listed = self.conn.execute(
+                "select 1 from pg_attribute where attrelid = to_regclass('bank_postings') "
+                "and attname = 'last_listed_at' and not attisdropped").fetchone() is not None
+        return self._stamps_listed
+
     def apply(self, board_id: str, upserts: List[Posting], closed: List[str], sched: Dict[str, Any],
-              list_hash: Optional[str], now: datetime) -> None:
+              list_hash: Optional[str], now: datetime, listed: Sequence[str] = ()) -> None:
+        """`listed`: the postings a read that could not list its whole board did list."""
         with self.lock, self.conn.transaction():
             if upserts:
                 with self.conn.cursor() as cur:
@@ -100,6 +110,13 @@ class Bank:
                     (board_id, [p.id for p in upserts]))}
                 upserts = list({p.id: p for p in upserts if p.id in owned}.values())
             self._publish(upserts, closed)
+            if listed and self._has_last_listed():
+                # Such a read closes nothing, so it says what is still listed, once a day each
+                # (whichever board holds the posting): bank_touch_published vouches only for those.
+                self.conn.execute(
+                    "update bank_postings set last_listed_at = %s where id = any(%s) and closed_at is null "
+                    "and (last_listed_at is null or last_listed_at <= %s::timestamptz - interval '1 day')",
+                    (now, list(listed), now))
             self._board_update(board_id, sched, ", last_error = null, last_ok_at = %s, list_hash = %s, open_postings = "
                                "(select count(*) from bank_postings where board_id = %s and closed_at is null)",
                                (now, list_hash, board_id))

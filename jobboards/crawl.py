@@ -23,6 +23,7 @@ CHANGED_HOURS, MAX_HOURS = 1.0, 48.0
 # starts: read what falls due before this run's budget runs out, or 1 h becomes 2 h.
 DUE_EARLY_MINUTES = 45
 EMPTY_DAYS, DEAD_AFTER_DAYS, DEAD_RECHECK_DAYS = 7, 7, 30
+EMPTY_ONCE = "EmptyListing: "  # last_error of a board whose last read was an empty answer nobody believed yet
 NEEDS_KNOWN = {"icims"}  # readers that skip postings the bank already holds unchanged
 
 # Boards on these platforms share one API host; the rest are their own host.
@@ -47,7 +48,7 @@ def diff(stored: Dict[str, Tuple[str, bool]], listing: Listing) -> Tuple[List[Po
 
 
 def schedule(row: Dict[str, Any], outcome: str, now: datetime) -> Dict[str, Any]:
-    """outcome: changed | unchanged | empty | failed | not_a_board."""
+    """outcome: changed | unchanged | empty, or a failure: failed | not_a_board | empty_unconfirmed."""
     interval = float(row.get("interval_hours") or CHANGED_HOURS)
     ok = {"fail_count": 0, "failing_since": None}
     if outcome == "changed":
@@ -61,13 +62,20 @@ def schedule(row: Dict[str, Any], outcome: str, now: datetime) -> Dict[str, Any]
                 "next_check_at": now + timedelta(days=EMPTY_DAYS), **ok}
     fails = int(row.get("fail_count") or 0) + 1
     since = row.get("failing_since") or now
+    # An empty answer nobody believed yet never makes a board dead: dead closes every posting,
+    # which is what the second empty read is there to confirm first.
     dead = (outcome == "not_a_board" and row.get("last_ok_at") is None) \
-        or since <= now - timedelta(days=DEAD_AFTER_DAYS)
+        or (outcome != "empty_unconfirmed" and since <= now - timedelta(days=DEAD_AFTER_DAYS))
     if dead:
         return {"status": "dead", "interval_hours": interval, "fail_count": fails, "failing_since": since,
                 "next_check_at": now + timedelta(days=DEAD_RECHECK_DAYS)}
+    wait = timedelta(hours=min(24, 2 ** (fails - 1)))
+    if outcome == "empty_unconfirmed":
+        # A run reads boards DUE_EARLY_MINUTES before they fall due, so without the margin the
+        # second read could come a quarter hour later and a short blip would still close the board.
+        wait = timedelta(hours=CHANGED_HOURS, minutes=DUE_EARLY_MINUTES)
     return {"status": row.get("status") or "new", "interval_hours": interval, "fail_count": fails,
-            "failing_since": since, "next_check_at": now + timedelta(hours=min(24, 2 ** (fails - 1)))}
+            "failing_since": since, "next_check_at": now + wait}
 
 
 def crawl_board(bank: Any, row: Dict[str, Any], http: Any, now: datetime,
@@ -90,9 +98,16 @@ def crawl_board(bank: Any, row: Dict[str, Any], http: Any, now: datetime,
             bank.mark_unchanged(row["id"], schedule(row, outcome, now), now)
             return outcome, 0, 0
         upserts, closed = diff(bank.stored(row["id"]), listing)
-        outcome = "empty" if empty else "changed" if (upserts or closed or not listing.complete) else "unchanged"
-        bank.apply(row["id"], upserts, closed, schedule(row, outcome, now), digest, now)
-        return outcome, len(upserts), len(closed)
+        if empty and closed and not str(row.get("last_error") or "").startswith(EMPTY_ONCE):
+            # A 200 with no jobs in it is what a platform sends during a blip as well as when a
+            # board really emptied. One such answer closes nothing: it counts as a failed read
+            # (an hour's wait from a healthy board), and only a second one in a row closes.
+            outcome, error = "empty_unconfirmed", f"{EMPTY_ONCE}no postings listed, {len(closed)} open here"
+        else:
+            outcome = "empty" if empty else "changed" if (upserts or closed or not listing.complete) else "unchanged"
+            listed = [] if listing.complete else sorted({p.id for p in listing.postings} | listing.keep)
+            bank.apply(row["id"], upserts, closed, schedule(row, outcome, now), digest, now, listed)
+            return outcome, len(upserts), len(closed)
     bank.fail(row["id"], error[:500], schedule(row, outcome, now), now)
     return outcome, 0, 0
 
