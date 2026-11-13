@@ -38,6 +38,7 @@ class Bank:
         self.conn = psycopg.connect(dsn, autocommit=True, prepare_threshold=None, row_factory=dict_row)
         self.lock = threading.Lock()  # one connection, many crawl threads
         self._stamps_listed: Optional[bool] = None  # asked once: is bank_postings.last_listed_at there?
+        self._confirms_gone: Optional[bool] = None  # is gone_first_seen_at available?
 
     def close(self) -> None:
         self.conn.close()
@@ -107,10 +108,39 @@ class Bank:
                 "and attname = 'last_listed_at' and not attisdropped").fetchone() is not None
         return self._stamps_listed
 
+    def _has_gone_confirmation(self) -> bool:
+        """Whether two separate posting checks can be persisted safely."""
+        if self._confirms_gone is None:
+            self._confirms_gone = self.conn.execute(
+                "select 1 from pg_attribute where attrelid = to_regclass('bank_postings') "
+                "and attname = 'gone_first_seen_at' and not attisdropped").fetchone() is not None
+        return self._confirms_gone
+
+    def _clear_gone_confirmation(self, board_id: str, confirmed: Sequence[str]) -> None:
+        """Clear absence evidence for ids this read definitively found present.
+
+        Caller holds `self.lock`; this also works before the migration by doing
+        nothing, matching the fail-closed checked-gone behavior.
+        """
+        if confirmed and self._has_gone_confirmation():
+            self.conn.execute(
+                "update bank_postings set gone_first_seen_at = null "
+                "where board_id = %s and id = any(%s) and gone_first_seen_at is not null",
+                (board_id, list(dict.fromkeys(confirmed))))
+
     def apply(self, board_id: str, upserts: List[Posting], closed: List[str], sched: Dict[str, Any],
               list_hash: Optional[str], now: datetime, listed: Sequence[str] = (),
-              listed_postings: Sequence[Posting] = ()) -> None:
-        """`listed`: ids a partial read listed; `listed_postings`: their current full records."""
+              listed_postings: Sequence[Posting] = (), checked_gone: Sequence[str] = (),
+              confirmed: Sequence[str] = ()) -> int:
+        """Apply one board read.
+
+        `listed` are ids a partial read stamps for stale-sweep protection;
+        `listed_postings` are their current full records. `confirmed` are every
+        id this read definitively found present, including complete reads.
+        `checked_gone` are definitive per-posting absence answers. They close
+        only after a second answer at least an hour after the first, persisted
+        by 20261113_posting_gone_confirmation.sql.
+        """
         with self.lock, self.conn.transaction():
             if upserts:
                 with self.conn.cursor() as cur:
@@ -118,6 +148,27 @@ class Bank:
                         (p.id, p.source, board_id, p.company_name, p.title, p.locations, p.workplace, p.employment_type,
                          p.department, p.url, p.apply_url, p.posted_at, p.source_updated_at, p.content_hash(), now, now)
                         for p in upserts])
+            confirms_gone = self._has_gone_confirmation()
+            # A complete unchanged listing has no upserts and no partial-read
+            # stamps, so presence must be passed independently by the caller.
+            self._clear_gone_confirmation(board_id, [*confirmed, *(p.id for p in upserts)])
+            confirmed_gone: List[str] = []
+            if confirms_gone and checked_gone:
+                checked = list(dict.fromkeys(checked_gone))
+                confirmed_gone = [r["id"] for r in self.conn.execute(
+                    "update bank_postings set closed_at = %s, changed_at = %s, gone_first_seen_at = null "
+                    "where board_id = %s and id = any(%s) and closed_at is null "
+                    "and gone_first_seen_at <= %s::timestamptz - interval '1 hour' returning id",
+                    (now, now, board_id, checked, now))]
+                closed_after_confirmation = set(confirmed_gone)
+                first_answers = [posting_id for posting_id in checked if posting_id not in closed_after_confirmation]
+                if first_answers:
+                    self.conn.execute(
+                        "update bank_postings set gone_first_seen_at = %s "
+                        "where board_id = %s and id = any(%s) and closed_at is null "
+                        "and gone_first_seen_at is null",
+                        (now, board_id, first_answers))
+            closed = list(dict.fromkeys([*closed, *confirmed_gone]))
             if closed:
                 self.conn.execute("update bank_postings set closed_at = %s, changed_at = %s "
                                   "where board_id = %s and id = any(%s) and closed_at is null",
@@ -152,6 +203,7 @@ class Bank:
             self._board_update(board_id, sched, ", last_error = null, last_ok_at = %s, list_hash = %s, open_postings = "
                                "(select count(*) from bank_postings where board_id = %s and closed_at is null)",
                                (now, list_hash, board_id))
+            return len(closed)
 
     def _publish(self, upserts: List[Posting], closed: List[str]) -> None:
         """Same transaction as the bank write: the site never misses a change the bank took."""
@@ -236,8 +288,10 @@ class Bank:
                 "delete from job_bank_jobright_links l where l.posting_id is not null and not exists "
                 "(select 1 from bank_postings b where b.id = l.posting_id and b.closed_at is null)").rowcount
 
-    def mark_unchanged(self, board_id: str, sched: Dict[str, Any], now: datetime) -> None:
-        with self.lock:
+    def mark_unchanged(self, board_id: str, sched: Dict[str, Any], now: datetime,
+                       confirmed: Sequence[str] = ()) -> None:
+        with self.lock, self.conn.transaction():
+            self._clear_gone_confirmation(board_id, confirmed)
             self._board_update(board_id, sched, ", last_error = null, last_ok_at = %s", (now,))
 
     def fail(self, board_id: str, error: str, sched: Dict[str, Any], now: datetime) -> None:

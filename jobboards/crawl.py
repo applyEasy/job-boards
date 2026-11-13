@@ -120,9 +120,10 @@ def crawl_board(bank: Any, row: Dict[str, Any], http: Any, now: datetime,
     else:
         digest = list_hash(listing) if listing.complete else None
         empty = listing.complete and not listing.postings and not listing.keep
+        confirmed = sorted({p.id for p in listing.postings} | listing.keep)
         if digest and digest == row.get("list_hash"):
             outcome = "empty" if empty else "unchanged"
-            bank.mark_unchanged(row["id"], schedule(row, outcome, now), now)
+            bank.mark_unchanged(row["id"], schedule(row, outcome, now), now, confirmed)
             return outcome, 0, 0
         upserts, closed = diff(bank.stored(row["id"]), listing)
         if empty and closed and not str(row.get("last_error") or "").startswith(EMPTY_ONCE):
@@ -137,11 +138,14 @@ def crawl_board(bank: Any, row: Dict[str, Any], http: Any, now: datetime,
             gone = gone or GONE.get(row["provider"])
             if listed and gone:
                 gone_ids, there = check_unlisted(bank, row["id"], listing, listed, gone, http, now)
-                closed = closed + gone_ids
                 listed = sorted({*listed, *(p.id for p in there)})  # confirmed there counts as listed
-            bank.apply(row["id"], upserts, closed, schedule(row, outcome, now), digest, now,
-                       listed, [*listing.postings, *there] if listed else ())
-            return outcome, len(upserts), len(closed)
+                confirmed = sorted({*confirmed, *(p.id for p in there)})
+            closed_count = bank.apply(
+                row["id"], upserts, closed, schedule(row, outcome, now), digest, now,
+                listed, [*listing.postings, *there] if listed else (), gone_ids if listed and gone else (),
+                confirmed,
+            )
+            return outcome, len(upserts), closed_count
     bank.fail(row["id"], error[:500], schedule(row, outcome, now), now)
     return outcome, 0, 0
 

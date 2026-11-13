@@ -204,9 +204,10 @@ def has_last_listed(bank):
 
 @pytest.fixture
 def listed_bank(bank):
-    """The bank after both migrations, which the database's owner applies by hand."""
+    """The bank after capped-board migrations, which the database owner applies by hand."""
     with psycopg.connect(DSN, autocommit=True) as conn:
         conn.execute((SQL / "20261112_last_listed_at.sql").read_text())
+        conn.execute((SQL / "20261113_posting_gone_confirmation.sql").read_text())
         conn.execute((SQL / "20261112_touch_listed_postings.sql").read_text())
     return bank
 
@@ -317,7 +318,7 @@ def test_without_the_last_listed_column_nothing_is_unconfirmed(bank):
     assert bank.unconfirmed("greenhouse:acme", [], T0 + timedelta(days=30), 10) == []
 
 
-def test_a_checked_posting_that_is_gone_comes_down_and_one_that_is_there_goes_back_up(listed_bank):
+def test_two_separated_gone_checks_close_while_present_clears_evidence_and_recovers(listed_bank):
     bank, now = listed_bank, datetime.now(timezone.utc)
     interns = [post(n, "Intern") for n in (1, 2, 3)]
     crawl_board(bank, the_board(bank), None, now - timedelta(days=10), read=reader_of(Listing(interns, True)))
@@ -327,13 +328,83 @@ def test_a_checked_posting_that_is_gone_comes_down_and_one_that_is_there_goes_ba
     def check(url, http):
         return {"1": False, "2": True, "3": False}[url.rsplit("/", 1)[-1]]
     assert crawl_board(bank, the_board(bank), None, now, read=reader_of(Listing(interns[:1], False)),
-                       gone=check) == ("changed", 0, 1)
+                       gone=check) == ("changed", 0, 0)
 
     got, live = rows(bank), site(bank)
-    assert got["gh-acme-2"]["closed_at"] == now and not live["gh-acme-2"]["is_active"]
+    assert got["gh-acme-2"]["closed_at"] is None and got["gh-acme-2"]["gone_first_seen_at"] == now
     assert got["gh-acme-3"]["closed_at"] is None and got["gh-acme-3"]["last_listed_at"] == now
     assert live["gh-acme-3"]["is_active"]  # confirmed there: back on the site
+    later = now + timedelta(hours=2)
+    assert crawl_board(bank, the_board(bank), None, later, read=reader_of(Listing(interns[:1], False)),
+                       gone=check) == ("changed", 0, 1)
+    got, live = rows(bank), site(bank)
+    assert got["gh-acme-2"]["closed_at"] == later and not live["gh-acme-2"]["is_active"]
+    assert got["gh-acme-3"]["gone_first_seen_at"] is None
     assert the_board(bank)["open_postings"] == 2
+
+
+def test_present_between_gone_answers_resets_confirmation(listed_bank):
+    bank, now = listed_bank, datetime.now(timezone.utc)
+    interns = [post(1, "Intern"), post(2, "Intern")]
+    crawl_board(bank, the_board(bank), None, now - timedelta(days=10), read=reader_of(Listing(interns, True)))
+
+    answers = iter((True, False, True))
+    for days in (0, 4, 8):
+        answer = next(answers)
+        def check(url, http, answer=answer):
+            return False if url.endswith("/1") else answer
+        assert crawl_board(bank, the_board(bank), None, now + timedelta(days=days),
+                           read=reader_of(Listing(interns[:1], False)), gone=check) == ("changed", 0, 0)
+
+    got = rows(bank)["gh-acme-2"]
+    assert got["closed_at"] is None and got["gone_first_seen_at"] == now + timedelta(days=8)
+
+
+def test_complete_unchanged_listing_clears_absence_evidence_in_both_write_paths(listed_bank):
+    bank, now = listed_bank, datetime.now(timezone.utc)
+    interns = [post(1, "Intern"), post(2, "Intern")]
+    crawl_board(bank, the_board(bank), None, now - timedelta(days=10), read=reader_of(Listing(interns, True)))
+
+    def absent_two(url, http):
+        return False if url.endswith("/1") else True
+
+    # First ABSENT is evidence only. A complete listing has no changed postings,
+    # but is still a definitive PRESENT for both ids and must clear it.
+    assert crawl_board(bank, the_board(bank), None, now, read=reader_of(Listing(interns[:1], False)),
+                       gone=absent_two) == ("changed", 0, 0)
+    assert rows(bank)["gh-acme-2"]["gone_first_seen_at"] == now
+    complete = now + timedelta(days=4)
+    assert crawl_board(bank, the_board(bank), None, complete, read=reader_of(Listing(interns, True))) == (
+        "unchanged", 0, 0)
+    assert rows(bank)["gh-acme-2"]["gone_first_seen_at"] is None
+
+    # A later ABSENT starts from one again rather than closing on stale evidence.
+    assert crawl_board(bank, the_board(bank), None, now + timedelta(days=8),
+                       read=reader_of(Listing(interns[:1], False)), gone=absent_two) == ("changed", 0, 0)
+    assert rows(bank)["gh-acme-2"]["closed_at"] is None
+
+    # Exercise the list-hash fast path too: it bypasses Bank.apply.
+    hashed = now + timedelta(days=9)
+    crawl_board(bank, the_board(bank), None, hashed, read=reader_of(Listing(interns, True)))
+    bank.query("update bank_postings set gone_first_seen_at = %s where id = 'gh-acme-2'", (hashed,))
+    assert crawl_board(bank, the_board(bank), None, hashed + timedelta(days=1),
+                       read=reader_of(Listing(interns, True))) == ("unchanged", 0, 0)
+    assert rows(bank)["gh-acme-2"]["gone_first_seen_at"] is None
+
+
+def test_without_gone_confirmation_migration_absence_checks_fail_closed(bank):
+    now = datetime.now(timezone.utc)
+    interns = [post(1, "Intern"), post(2, "Intern")]
+    crawl_board(bank, the_board(bank), None, now - timedelta(days=10), read=reader_of(Listing(interns, True)))
+    with psycopg.connect(DSN, autocommit=True) as conn:
+        conn.execute((SQL / "20261112_last_listed_at.sql").read_text())
+
+    def check(url, http):
+        return False if url.endswith("/1") else True
+    for hours in (0, 2):
+        assert crawl_board(bank, the_board(bank), None, now + timedelta(hours=hours),
+                           read=reader_of(Listing(interns[:1], False)), gone=check) == ("changed", 0, 0)
+    assert rows(bank)["gh-acme-2"]["closed_at"] is None
 
 
 def test_stats_counts_boards_postings_and_failing_ones(bank):
