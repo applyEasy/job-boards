@@ -24,7 +24,7 @@ def main() -> None:
         parser.error("audit window must be positive and at most two hours")
 
     with psycopg.connect(os.environ["BANK_DATABASE_URL"], autocommit=True, connect_timeout=15) as conn:
-        conn.execute("BEGIN READ ONLY")
+        conn.execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
         conn.execute("SET LOCAL statement_timeout = '45s'")
         columns = conn.execute(
             """select column_name, data_type, is_nullable
@@ -58,8 +58,16 @@ def main() -> None:
         ).fetchall()
         conn.execute("ROLLBACK")
 
+    latest_closed_rows = sum(row[1] for row in by_provider)
+    reported_closure_events = sum(row[3] for row in runs)
     print(json.dumps({
         "window": [args.start.isoformat(), args.end.isoformat()],
+        "interpretation": (
+            "Provider and board counts are current rows whose latest close falls in this window. "
+            "Reopened rows disappear; bank_runs is the authoritative reported closure-event total."
+        ),
+        "latest_closed_rows_in_window": latest_closed_rows,
+        "reported_closure_events": reported_closure_events,
         "columns": [dict(zip(("name", "type", "nullable"), row)) for row in columns],
         "by_provider": [dict(zip(("provider", "closed", "boards"), row)) for row in by_provider],
         "top_boards": [dict(zip(("board_id", "provider", "status", "closed"), row)) for row in top_boards],

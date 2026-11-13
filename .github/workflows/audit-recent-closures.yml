@@ -12,6 +12,9 @@ on:
         type: string
 permissions:
   contents: read
+concurrency:
+  group: bank-crawl
+  cancel-in-progress: false
 jobs:
   audit:
     if: github.repository == 'applyEasy/job-boards'
