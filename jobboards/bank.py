@@ -39,6 +39,7 @@ class Bank:
         self.lock = threading.Lock()  # one connection, many crawl threads
         self._stamps_listed: Optional[bool] = None  # asked once: is bank_postings.last_listed_at there?
         self._confirms_gone: Optional[bool] = None  # is gone_first_seen_at available?
+        self._indexes_gone: Optional[bool] = None  # is bank_postings_gone_by_board built and valid?
 
     def close(self) -> None:
         self.conn.close()
@@ -122,11 +123,32 @@ class Bank:
         Caller holds `self.lock`; this also works before the migration by doing
         nothing, matching the fail-closed checked-gone behavior.
         """
-        if confirmed and self._has_gone_confirmation():
-            self.conn.execute(
-                "update bank_postings set gone_first_seen_at = null "
-                "where board_id = %s and id = any(%s) and gone_first_seen_at is not null",
-                (board_id, list(dict.fromkeys(confirmed))))
+        if not confirmed or not self._has_gone_confirmation():
+            return
+        ids = list(dict.fromkeys(confirmed))
+        if self._has_gone_index():
+            # Almost no posting carries the mark, but the update below reads every listed
+            # posting to find that out: 367k runs changed 142 rows (11/9-11/19). The
+            # partial index answers "which of this board's are marked" without them.
+            marked = {r["id"] for r in self.conn.execute(
+                "select id from bank_postings where board_id = %s and gone_first_seen_at is not null",
+                (board_id,))}
+            ids = [i for i in ids if i in marked]
+            if not ids:
+                return
+        self.conn.execute(
+            "update bank_postings set gone_first_seen_at = null "
+            "where board_id = %s and id = any(%s) and gone_first_seen_at is not null",
+            (board_id, ids))
+
+    def _has_gone_index(self) -> bool:
+        """sql/20261120_board_lookup_indexes.sql builds it. Without it (or with a failed,
+        invalid build) the marked-ids read above would scan the table, so it is skipped."""
+        if self._indexes_gone is None:
+            self._indexes_gone = self.conn.execute(
+                "select 1 from pg_index where indexrelid = to_regclass('public.bank_postings_gone_by_board') "
+                "and indisvalid").fetchone() is not None
+        return self._indexes_gone
 
     def apply(self, board_id: str, upserts: List[Posting], closed: List[str], sched: Dict[str, Any],
               list_hash: Optional[str], now: datetime, listed: Sequence[str] = (),
