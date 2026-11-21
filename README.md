@@ -56,6 +56,9 @@ board is read.
    `sql/20261015_jobright_links.sql` (resolve) and `sql/20261016_agent_finder.sql` (find).
    For boards too big to list in full: `sql/20261112_last_listed_at.sql`, then
    `sql/20261112_touch_listed_postings.sql` (its header says what to count first).
+   Then `sql/20261120_board_lookup_indexes.sql` with `psql` (it builds indexes
+   concurrently, so not in one SQL-editor run): the per-board reads stop
+   scanning the whole postings table.
 2. Give the role a password: `alter role job_boards_crawler login password '<openssl rand -hex 24>';`
 3. Add the repo secret `BANK_DATABASE_URL`:
    `postgresql://job_boards_crawler.<project-ref>:<password>@<session-pooler-host>:5432/postgres`

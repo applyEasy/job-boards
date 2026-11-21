@@ -202,14 +202,43 @@ def has_last_listed(bank):
                            "and column_name = 'last_listed_at'"))
 
 
-@pytest.fixture
-def listed_bank(bank):
-    """The bank after capped-board migrations, which the database owner applies by hand."""
+def apply_one_by_one(conn, name):
+    """A migration whose statements must each run alone, as psql runs them
+    (CREATE INDEX CONCURRENTLY refuses a multi-statement query)."""
+    code = "\n".join(line for line in (SQL / name).read_text().splitlines() if not line.lstrip().startswith("--"))
+    for statement in code.split(";"):
+        if statement.strip():
+            conn.execute(statement)
+
+
+@pytest.fixture(params=["before_board_indexes", "with_board_indexes"])
+def listed_bank(bank, request):
+    """The bank after capped-board migrations, which the database owner applies by hand,
+    with and without 20261120_board_lookup_indexes.sql: both must behave the same."""
     with psycopg.connect(DSN, autocommit=True) as conn:
         conn.execute((SQL / "20261112_last_listed_at.sql").read_text())
         conn.execute((SQL / "20261113_posting_gone_confirmation.sql").read_text())
         conn.execute((SQL / "20261112_touch_listed_postings.sql").read_text())
+        if request.param == "with_board_indexes":
+            apply_one_by_one(conn, "20261120_board_lookup_indexes.sql")
     return bank
+
+
+def test_board_lookup_indexes_serve_the_per_board_reads(listed_bank):
+    """Bank.stored() and the marked-ids read must not scan the table (Supabase disk IO, 11/19)."""
+    bank = listed_bank
+    with psycopg.connect(DSN, autocommit=True) as conn:
+        apply_one_by_one(conn, "20261120_board_lookup_indexes.sql")  # a rerun is a no-op
+        conn.execute("set enable_seqscan = off")  # a tiny test table would be scanned anyway
+
+        def plan(sql):
+            return "\n".join(r[0] for r in conn.execute("explain " + sql))
+
+        assert "bank_postings_by_board" in plan(
+            "select id, content_hash, closed_at is null as open from bank_postings where board_id = 'gh-acme'")
+        assert "bank_postings_gone_by_board" in plan(
+            "select id from bank_postings where board_id = 'gh-acme' and gone_first_seen_at is not null")
+    assert bank._has_gone_index()
 
 
 def test_without_the_last_listed_column_an_incomplete_read_writes_as_before(bank):
